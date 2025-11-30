@@ -1,12 +1,17 @@
-import shutil
 from fastapi import APIRouter, UploadFile, File, Depends
 from sqlalchemy.orm import Session
-from app.database import SessionLocal
-from app.models.scan import Scan
-from app.services.reconstruction_service import reconstruct_3d
-from app.services.prediction_service import analyze_injury
+from database import SessionLocal
+from models.scan import Scan
+from services.reconstruction_service import reconstruct_3d, analyze_injury
+
+import shutil
+import uuid
+import os
 
 router = APIRouter()
+
+UPLOAD_DIR = "uploads/"
+os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 def get_db():
     db = SessionLocal()
@@ -16,39 +21,38 @@ def get_db():
         db.close()
 
 
-@router.post("/upload/{patient_id}")
-async def upload_scan(patient_id: int,
-                      image: UploadFile = File(...),
-                      db: Session = Depends(get_db)):
+@router.post("/upload")
+async def upload_scan(patient_id: int, file: UploadFile = File(...), db: Session = Depends(get_db)):
 
-    # Save file
-    file_path = f"uploads/{image.filename}"
-    with open(file_path, "wb") as buffer:
-        shutil.copyfileobj(image.file, buffer)
+    # save file
+    file_id = str(uuid.uuid4())
+    saved_path = f"{UPLOAD_DIR}/{file_id}_{file.filename}"
 
-    # 3D Reconstruction
-    reconstruction_path = reconstruct_3d(file_path)
+    with open(saved_path, "wb") as buffer:
+        shutil.copyfileobj(file.file, buffer)
 
-    # Prediction Model
-    injury_result = analyze_injury(reconstruction_path)
+    # run reconstruction (BrainChop/MONAI)
+    reconstruction_path = reconstruct_3d(saved_path)
 
-    # Save scan record
+    # run injury analysis (your own logic)
+    result = analyze_injury(reconstruction_path)
+
+    # save to DB
     scan = Scan(
         patient_id=patient_id,
-        image_type=injury_result["image_type"],
-        original_path=file_path,
+        file_path=saved_path,
         reconstruction_path=reconstruction_path,
-        detected_injury=injury_result["injury"],
-        injury_size=injury_result["injury_size"],
-        risk_score=injury_result["risk_score"]
+        injury_size_mm=result["injury_size_mm"],
+        classification=result["classification"],
+        risks=result["risks_json"]
     )
+    
     db.add(scan)
     db.commit()
     db.refresh(scan)
 
     return {
+        "message": "Scan processed successfully.",
         "scan_id": scan.id,
-        "message": "Scan processed successfully",
-        "injury": scan.detected_injury,
-        "risk_score": scan.risk_score
+        "results": result
     }
