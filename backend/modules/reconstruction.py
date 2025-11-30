@@ -1,5 +1,11 @@
-def reconstruct_3d(image_path: str) -> str:
-    # TODO: connect to your AI model or Brainchop/Monai
-    output_path = image_path.replace("uploads", "models3d") + ".obj"
-    # Fake output
+def reconstruct_3d(filepath: str) -> str:
+    import brainchop
+
+    model = brainchop.load_model("brain")
+    volume = brainchop.load_image(filepath)
+    segmented = model.predict(volume)
+
+    output_path = filepath.replace(".nii", "_3d.nii")
+    brainchop.save(segmented, output_path)
+
     return output_path
