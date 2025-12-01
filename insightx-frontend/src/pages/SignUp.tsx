@@ -6,6 +6,7 @@ import RoleSelector from "../components/RoleSelector";
 import AccountInfoFields from "../components/forms/AccountInfoFields.tsx";
 import ResearchInfoFields from "../components/forms/ResearchInfoFields";
 import DoctorInfoFields from "../components/forms/DoctorInfoFields";
+import PatientInfoFields from "../components/forms/PatientInfoFields";
 import ConsentSection from "../components/forms/ConsentSection";
 
 type Role = "patient" | "researcher" | "doctor";
@@ -24,6 +25,7 @@ type Values = {
   hospital: string;
   department: string;
   professionalId: string;
+  patientId: string;
   acceptedTerms: boolean;
   acceptedResearchConsent: boolean;
 };
@@ -41,6 +43,7 @@ const initialValues: Values = {
   hospital: "",
   department: "",
   professionalId: "",
+  patientId: "",
   acceptedTerms: false,
   acceptedResearchConsent: false,
 };
@@ -53,9 +56,7 @@ const SignUp: React.FC = () => {
   const [errors, setErrors] = useState<Errors>({});
   const [submitted, setSubmitted] = useState(false);
 
-  const handleChange = (
-    e: React.ChangeEvent<HTMLInputElement>
-  ) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setValues((prev) => ({
       ...prev,
@@ -63,9 +64,7 @@ const SignUp: React.FC = () => {
     }));
   };
 
-  const handleCheckboxChange = (
-    e: React.ChangeEvent<HTMLInputElement>
-  ) => {
+  const handleCheckboxChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, checked } = e.target;
     setValues((prev) => ({
       ...prev,
@@ -91,7 +90,7 @@ const SignUp: React.FC = () => {
     else if (vals.confirmPassword !== vals.password)
       newErrors.confirmPassword = "Passwords do not match.";
 
-    // role-specific required fields
+    // researcher
     if (currentRole === "researcher") {
       if (!vals.institution.trim())
         newErrors.institution = "Institution is required.";
@@ -101,6 +100,7 @@ const SignUp: React.FC = () => {
         newErrors.intendedUse = "Intended use is required.";
     }
 
+    // doctor
     if (currentRole === "doctor") {
       if (!vals.hospital.trim())
         newErrors.hospital = "Hospital/Clinic name is required.";
@@ -110,11 +110,16 @@ const SignUp: React.FC = () => {
         newErrors.professionalId = "Professional ID is required.";
     }
 
+    // patient (NEW)
+    if (currentRole === "patient") {
+      if (!vals.professionalId.trim())
+        newErrors.professionalId = "Professional ID is required.";
+    }
+
     // consent
     if (!vals.acceptedTerms)
       newErrors.acceptedTerms = "You must accept the Terms & Privacy Policy.";
 
-    // you can enforce research consent only for some roles if you want
     return newErrors;
   };
 
@@ -126,7 +131,6 @@ const SignUp: React.FC = () => {
     if (Object.keys(validation).length === 0) {
       setSubmitted(true);
       console.log("Form submitted:", { role, values });
-      // here you would call your API
     } else {
       setSubmitted(false);
     }
@@ -193,6 +197,16 @@ const SignUp: React.FC = () => {
             onChange={handleChange}
           />
         )}
+
+        {role === "patient" && (
+          <PatientInfoFields
+            values={{ patientId: values.patientId }}
+            errors={{ patientId: errors.patientId }}
+            onChange={handleChange}
+          />
+        )}
+
+
 
         <ConsentSection
           role={role}
