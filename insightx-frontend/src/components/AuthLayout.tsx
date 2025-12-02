@@ -6,17 +6,20 @@ const AuthLayout = ({ children }: { children: React.ReactNode }) => {
   return (
     <div className="min-h-screen flex">
       {/* Left gradient panel */}
-      <div className="hidden lg:flex w-1/2 bg-gradient-to-br from-sky-900 to-sky-600 items-center justify-center p-10">
-        <Link to="/">
-          <img
-            src={Logo}
-            alt="Logo"
-            className="mx-10 cursor-pointer"
-          />
-        </Link>
-        <h2 className="text-white text-4xl font-light leading-snug mt-10 max-w-md">
-          AI-Powered 3D Visualization Platform for Enhanced Medical Insight.
-        </h2>
+      <div className="hidden lg:flex w-1/2 bg-gradient-to-br from-sky-900 to-sky-600 p-10">
+        <div className="flex flex-col items-start">
+          <Link to="/">
+            <img
+              src={Logo}
+              alt="Logo"
+              className="cursor-pointer mb-8 w-32"
+            />
+          </Link>
+
+          <h2 className="text-white text-4xl font-light leading-snug max-w-md">
+            AI-Powered 3D Visualization Platform for Enhanced Medical Insight.
+          </h2>
+        </div>
       </div>
 
       {/* Right panel */}
