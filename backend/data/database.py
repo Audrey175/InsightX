@@ -40,6 +40,11 @@ def create_tables(cursor):
     cursor.execute("DROP TABLE IF EXISTS Patient;")
     cursor.execute("DROP TABLE IF EXISTS DatabaseSystem;")
     cursor.execute("DROP TABLE IF EXISTS MedicalImage;")
+    cursor.execute("DROP TABLE IF EXISTS AIReconstructionEngine;")
+    cursor.execute("DROP TABLE IF EXISTS Reconstruction3DModel;")
+    cursor.execute("DROP TABLE IF EXISTS Dashboard;")
+    cursor.execute("DROP TABLE IF EXISTS GeneralDashboard;")
+    cursor.execute("DROP TABLE IF EXISTS Chatbot;")
    
 
     # User table
@@ -96,6 +101,63 @@ def create_tables(cursor):
         uploadDate TEXT,
         anonymizedVersionPath TEXT,
         FOREIGN KEY (patientID) REFERENCES Patient(patientID)
+    );
+    """)
+
+    # AIReconstructionEngine table
+    cursor.execute("""
+    CREATE TABLE AIReconstructionEngine (
+        modelVersion TEXT PRIMARY KEY,
+        accuracy INTEGER,
+        errorRate Integer,
+    );
+    """)
+
+    # Reconstruction3DModel table
+    cursor.execute("""
+    CREATE TABLE Reconstruction3DModel (
+        modelID TEXT PRIMARY KEY ,
+        patientID TEXT,
+        sourceImageID TEXT,
+        filePath3DModel TEXT,
+        visualizationData TEXT,
+        confidenceScore TEXT,
+        FOREIGN KEY (patientID) REFERENCES Patient(patientID)        
+    );
+    """)
+
+    # Dashboard table
+    cursor.execute("""
+    CREATE TABLE Dashboard (
+        dashboardID TEXT PRIMARY KEY ,
+        patientID TEXT,
+        dashboardType TEXT,
+        statisticsData INTEGER,
+        diseaseTrends TEXT,
+        predictionResults TEXT,
+        FOREIGN KEY (patientID) REFERENCES Patient(patientID)        
+    );
+    """)
+
+    # ! Alert
+    # GeneralDashboard table
+    cursor.execute("""
+    CREATE TABLE GeneralDashboard (
+        dashboardID TEXT PRIMARY KEY,
+        totalPatients INTEGER,
+        totalDiseaseCases INTEGER,
+        successfullyTreated INTEGER,
+        highRiskIdentified INTEGER,
+        searchQuery TEXT
+    );
+    """)
+
+    # Chatbot table
+    cursor.execute("""
+    CREATE TABLE Chatbot (
+        chatbotID TEXT PRIMARY KEY ,
+        modelName TEXT,
+        knowledgeBase TEXT,
     );
     """)
 
@@ -158,7 +220,7 @@ def insert_medical_images(cursor, df):
     required_cols = ["imageID", "patientID", "imageType", "filePath", "uploadDate", "anonymizedVersionPath"]
 
     if not all(col in df.columns for col in required_cols):
-        return  # Skip if CSV does not contain image columns
+        return
 
     img_df = df.drop_duplicates(subset=["imageID"])[required_cols]
 
@@ -170,6 +232,81 @@ def insert_medical_images(cursor, df):
             VALUES (?, ?, ?, ?, ?, ?)
         """, tuple(row))
 
+def insert_ai_reconstruction_engine(cursor, df):
+    if "modelVersion" not in df.columns:
+        return
+
+    engine_df = df.drop_duplicates(subset=["modelVersion"])[[
+        "modelVersion", "accuracy", "errorRate"
+    ]]
+
+    for _, row in engine_df.iterrows():
+        cursor.execute("""
+            INSERT INTO AIReconstructionEngine VALUES (?, ?, ?)
+        """, tuple(row))
+
+
+def insert_reconstruction_3d_model(cursor, df):
+    required = [
+        "modelID", "patientID", "sourceImageID",
+        "filePath3DModel", "visualizationData", "confidenceScore"
+    ]
+
+    if not all(x in df.columns for x in required):
+        return
+
+    rec_df = df.drop_duplicates(subset=["modelID"])[required]
+
+    for _, row in rec_df.iterrows():
+        cursor.execute("""
+            INSERT INTO Reconstruction3DModel VALUES (?, ?, ?, ?, ?, ?)
+        """, tuple(row))
+
+
+def insert_dashboard(cursor, df):
+    if "dashboardID" not in df.columns:
+        return
+
+    dash_df = df.drop_duplicates(subset=["dashboardID"])[[
+        "dashboardID", "patientID", "dashboardType",
+        "statisticsData", "diseaseTrends", "predictionResults"
+    ]]
+
+    for _, row in dash_df.iterrows():
+        cursor.execute("""
+            INSERT INTO Dashboard VALUES (?, ?, ?, ?, ?, ?)
+        """, tuple(row))
+
+
+def insert_general_dashboard(cursor, df):
+    if "dashboardID" not in df.columns:
+        return
+
+    gen_df = df.drop_duplicates(subset=["dashboardID"])[[
+        "dashboardID", "totalPatients", "totalDiseaseCases",
+        "successfullyTreated", "highRiskIdentified", "searchQuery"
+    ]]
+
+    for _, row in gen_df.iterrows():
+        cursor.execute("""
+            INSERT INTO GeneralDashboard VALUES (?, ?, ?, ?, ?, ?)
+        """, tuple(row))
+
+
+def insert_chatbot(cursor, df):
+    if "chatbotID" not in df.columns:
+        return
+
+    chatbot_df = df.drop_duplicates(subset=["chatbotID"])[[
+        "chatbotID", "modelName", "knowledgeBase"
+    ]]
+
+    for _, row in chatbot_df.iterrows():
+        cursor.execute("""
+            INSERT INTO Chatbot VALUES (?, ?, ?)
+        """, tuple(row))
+
+
         
 # ===============================
 # 6. MAIN BUILD SCRIPT
@@ -180,10 +317,16 @@ def build_database():
     conn = create_connection(DB_FILE)
     cursor = conn.cursor()
 
-    create_tables(cursor)
-    insert_patients(cursor, df)
+    insert_users(cursor, df)
     insert_doctors(cursor, df)
+    insert_patients(cursor, df)
     insert_database_system(cursor, df)
+    insert_medical_images(cursor, df)
+    insert_ai_reconstruction_engine(cursor, df)
+    insert_reconstruction_3d_model(cursor, df)
+    insert_dashboard(cursor, df)
+    insert_general_dashboard(cursor, df)
+    insert_chatbot(cursor, df)
 
     conn.commit()
     conn.close()
@@ -197,9 +340,16 @@ def preview_samples():
     conn = create_connection(DB_FILE)
     cursor = conn.cursor()
 
+    print("Sample User row:", cursor.execute("SELECT * FROM User LIMIT 1;").fetchone())
     print("Sample Patient row:", cursor.execute("SELECT * FROM Patient LIMIT 1;").fetchone())
     print("Sample Doctor row:", cursor.execute("SELECT * FROM Doctor LIMIT 1;").fetchone())
     print("Sample DatabaseSystem row:", cursor.execute("SELECT * FROM DatabaseSystem LIMIT 1;").fetchone())
+    print("Sample MedicalImage row:", cursor.execute("SELECT * FROM MedicalImage LIMIT 1;").fetchone())
+    print("Sample AIReconstructionEngine row:", cursor.execute("SELECT * FROM AIReconstructionEngine LIMIT 1;").fetchone())
+    print("Sample Reconstruction3DModel row:", cursor.execute("SELECT * FROM Reconstruction3DModel LIMIT 1;").fetchone())
+    print("Sample Dashboard row:", cursor.execute("SELECT * FROM Dashboard LIMIT 1;").fetchone())
+    print("Sample GeneralDashboard row:", cursor.execute("SELECT * FROM GeneralDashboard LIMIT 1;").fetchone())
+    print("Sample Chatbot row:", cursor.execute("SELECT * FROM Chatbot LIMIT 1;").fetchone())
 
     conn.close()
 
