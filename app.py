@@ -1,16 +1,21 @@
 from fastapi import FastAPI
-from app.database import Base, engine
-from app.routers.patient_router import router as patient_router
-from app.routers.scan_router import router as scan_router
-from app.routers.dashboard_router import router as dashboard_router
+# from app.database import Base, engine
+# from app.routers.patient_router import router as patient_router
+# from app.routers.scan_router import router as scan_router
+# from app.routers.dashboard_router import router as dashboard_router
+from backend.routes.predict import router as prediction_router
 
-Base.metadata.create_all(bind=engine)
+
+# Base.metadata.create_all(bind=engine)
 
 app = FastAPI(
     title="Medical Imaging System",
     description="MRI/X-ray upload, 3D reconstruction, injury detection, dashboards"
 )
-
-app.include_router(patient_router, prefix="/patients", tags=["Patients"])
-app.include_router(scan_router, prefix="/scans", tags=["Scans"])
-app.include_router(dashboard_router, prefix="/dashboard", tags=["Dashboard"])
+app.include_router(prediction_router)
+@app.get("/")
+def root():
+    return {"message": "InsightX Diagnosis API is running!"}
+# app.include_router(patient_router, prefix="/patients", tags=["Patients"])
+# app.include_router(scan_router, prefix="/scans", tags=["Scans"])
+# app.include_router(dashboard_router, prefix="/dashboard", tags=["Dashboard"])
