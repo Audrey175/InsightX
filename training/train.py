@@ -4,15 +4,20 @@ import torch.optim as optim
 from torchvision import datasets, transforms, models
 from torch.utils.data import DataLoader
 from tqdm import tqdm
+from sklearn.metrics import confusion_matrix
+import numpy as np
 
-NUM_CLASSES = 4       # MRI normal/abnormal
-BATCH_SIZE = 16
-EPOCHS = 10
+NUM_CLASSES = 4       
+BATCH_SIZE = 32
+EPOCHS = 20
 LR = 1e-4
 MODEL_PATH = "efficientnet_mri.pth"
 
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 print("Using:", DEVICE)
+
+# Class names for confusion matrix
+CLASS_NAMES = ["Glioma", "Meningioma", "Notumor", "Pituitary"]
 
 train_tfms = transforms.Compose([
     transforms.Resize((224, 224)),
@@ -63,8 +68,14 @@ for epoch in range(EPOCHS):
 
         train_loss += loss.item()
 
+    # -----------------------------
+    # VALIDATION + CONFUSION MATRIX
+    # -----------------------------
     model.eval()
     correct, total = 0, 0
+
+    all_preds = []
+    all_labels = []
 
     with torch.no_grad():
         for imgs, labels in val_loader:
@@ -75,8 +86,26 @@ for epoch in range(EPOCHS):
             total += labels.size(0)
             correct += (preds == labels).sum().item()
 
-    val_acc = correct / total * 100
-    print(f"Epoch {epoch+1}/{EPOCHS} | Loss: {train_loss:.4f} | Val Acc: {val_acc:.2f}%")
+            # Store predictions for confusion matrix
+            all_preds.extend(preds.cpu().numpy())
+            all_labels.extend(labels.cpu().numpy())
 
+    val_acc = correct / total * 100
+
+    # Compute confusion matrix
+    cm = confusion_matrix(all_labels, all_preds)
+
+    print(f"\nEpoch {epoch+1}/{EPOCHS}")
+    print(f"Loss: {train_loss:.4f} | Val Acc: {val_acc:.2f}%")
+    print("\nConfusion Matrix:")
+    print(cm)
+
+    # Optional: Print with labels
+    print("\nLabeled Confusion Matrix:")
+    print("     " + "  ".join(f"{c[:6]:>7}" for c in CLASS_NAMES))
+    for i, row in enumerate(cm):
+        print(f"{CLASS_NAMES[i][:7]:<7} {row}")
+
+# Save final model
 torch.save(model.state_dict(), MODEL_PATH)
 print("Model saved:", MODEL_PATH)
