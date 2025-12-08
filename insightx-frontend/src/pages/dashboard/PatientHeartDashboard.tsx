@@ -1,15 +1,47 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import DashboardLayout from "../../layouts/DashboardLayout";
 import HeartHero from "../../assets/researchers.png";
-import { getPatientHeartFor } from "../../data/fakeDatabase";
+import { fetchPatientHeartScan } from "../../services/patientService";
+import type { PatientHeartRecord } from "../../data/patientHeartData";
+import { useAuth } from "../../context/AuthContext";
+import { LoadingState } from "../../components/ui/LoadingState";
+import { ErrorState } from "../../components/ui/ErrorState";
+
+const DEFAULT_PATIENT_ID = "P-0001";
 
 const PatientHeartDashboard: React.FC = () => {
-  const data = getPatientHeartFor("P-0001");
+  const { user } = useAuth();
+  const [data, setData] = useState<PatientHeartRecord | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  if (!data) {
+  useEffect(() => {
+    const patientId = user?.patientId ?? DEFAULT_PATIENT_ID;
+    setLoading(true);
+    setError(null);
+    fetchPatientHeartScan(patientId)
+      .then((record) => {
+        if (!record) {
+          setError("No heart scan data found.");
+        }
+        setData(record);
+      })
+      .catch((err: Error) => setError(err.message))
+      .finally(() => setLoading(false));
+  }, [user]);
+
+  if (loading) {
     return (
       <DashboardLayout>
-        <p className="text-sm text-red-500">No heart scan data found.</p>
+        <LoadingState message="Loading your heart scan..." />
+      </DashboardLayout>
+    );
+  }
+
+  if (error || !data) {
+    return (
+      <DashboardLayout>
+        <ErrorState message={error ?? "No heart scan data found."} />
       </DashboardLayout>
     );
   }
@@ -66,8 +98,8 @@ const PatientHeartDashboard: React.FC = () => {
         <div className="bg-white rounded-2xl shadow-sm border p-4">
           <h2 className="text-sm font-semibold">Doctor Notes</h2>
           <ul className="list-disc list-inside text-[11px] text-slate-700 space-y-1 mt-2">
-            {data.doctorNotes.map((n, i) => (
-              <li key={i}>{n}</li>
+            {data.doctorNotes.map((note) => (
+              <li key={note}>{note}</li>
             ))}
           </ul>
         </div>
