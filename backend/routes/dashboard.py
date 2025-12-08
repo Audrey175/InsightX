@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 from sqlalchemy.orm import Session
-from database import SessionLocal
+# from database import SessionLocal
 from models.scan import Scan
 
 router = APIRouter()
