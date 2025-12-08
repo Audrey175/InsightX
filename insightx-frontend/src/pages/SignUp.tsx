@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import AuthLayout from "../components/AuthLayout";
 import { Button } from "../components/ui/button";
 import RoleSelector from "../components/RoleSelector";
@@ -8,6 +8,7 @@ import ResearchInfoFields from "../components/forms/ResearchInfoFields";
 import DoctorInfoFields from "../components/forms/DoctorInfoFields";
 import PatientInfoFields from "../components/forms/PatientInfoFields";
 import ConsentSection from "../components/forms/ConsentSection";
+import { useAuth } from "../context/AuthContext";
 
 type Role = "patient" | "researcher" | "doctor";
 
@@ -55,6 +56,9 @@ const SignUp: React.FC = () => {
   const [values, setValues] = useState<Values>(initialValues);
   const [errors, setErrors] = useState<Errors>({});
   const [submitted, setSubmitted] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const { signup, isLoading } = useAuth();
+  const navigate = useNavigate();
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -75,7 +79,6 @@ const SignUp: React.FC = () => {
   const validate = (vals: Values, currentRole: Role): Errors => {
     const newErrors: Errors = {};
 
-    // basic
     if (!vals.fullName.trim()) newErrors.fullName = "Full Name is required.";
     if (!vals.email.trim()) newErrors.email = "Email is required.";
     else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(vals.email))
@@ -90,7 +93,6 @@ const SignUp: React.FC = () => {
     else if (vals.confirmPassword !== vals.password)
       newErrors.confirmPassword = "Passwords do not match.";
 
-    // researcher
     if (currentRole === "researcher") {
       if (!vals.institution.trim())
         newErrors.institution = "Institution is required.";
@@ -100,7 +102,6 @@ const SignUp: React.FC = () => {
         newErrors.intendedUse = "Intended use is required.";
     }
 
-    // doctor
     if (currentRole === "doctor") {
       if (!vals.hospital.trim())
         newErrors.hospital = "Hospital/Clinic name is required.";
@@ -110,27 +111,37 @@ const SignUp: React.FC = () => {
         newErrors.professionalId = "Professional ID is required.";
     }
 
-    // patient (NEW)
     if (currentRole === "patient") {
       if (!vals.professionalId.trim())
         newErrors.professionalId = "Professional ID is required.";
     }
 
-    // consent
     if (!vals.acceptedTerms)
       newErrors.acceptedTerms = "You must accept the Terms & Privacy Policy.";
 
     return newErrors;
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const validation = validate(values, role);
     setErrors(validation);
+    setSubmitError(null);
 
     if (Object.keys(validation).length === 0) {
-      setSubmitted(true);
-      console.log("Form submitted:", { role, values });
+      try {
+        await signup({
+          fullName: values.fullName,
+          email: values.email,
+          password: values.password,
+          role,
+        });
+        setSubmitted(true);
+        navigate("/dashboard", { replace: true });
+      } catch (err) {
+        setSubmitted(false);
+        setSubmitError((err as Error).message);
+      }
     } else {
       setSubmitted(false);
     }
@@ -206,8 +217,6 @@ const SignUp: React.FC = () => {
           />
         )}
 
-
-
         <ConsentSection
           role={role}
           acceptedTerms={values.acceptedTerms}
@@ -219,16 +228,21 @@ const SignUp: React.FC = () => {
           onChange={handleCheckboxChange}
         />
 
+        {submitError && (
+          <p className="text-sm text-red-500 mb-2">{submitError}</p>
+        )}
+
         <Button
           type="submit"
           className="w-full bg-blue-600 hover:bg-blue-700"
+          disabled={isLoading}
         >
-          Create Account
+          {isLoading ? "Creating account..." : "Create Account"}
         </Button>
 
         {submitted && (
           <p className="mt-3 text-xs text-green-600">
-            ✅ Form is valid. (You can now connect this to your backend.)
+            Form is valid. You are now signed up.
           </p>
         )}
 

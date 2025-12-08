@@ -1,16 +1,47 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import DashboardLayout from "../../layouts/DashboardLayout";
 import BrainHero from "../../assets/brainhome.png";
-import { getPatientBrainFor } from "../../data/fakeDatabase";
+import { fetchPatientBrainScan } from "../../services/patientService";
+import type { PatientBrainRecord } from "../../data/patientBrainData";
+import { useAuth } from "../../context/AuthContext";
+import { LoadingState } from "../../components/ui/LoadingState";
+import { ErrorState } from "../../components/ui/ErrorState";
+
+const DEFAULT_PATIENT_ID = "P-0001";
 
 const PatientBrainDashboard: React.FC = () => {
-  // In future: derive patientId from auth / route.
-  const data = getPatientBrainFor("P-0001");
+  const { user } = useAuth();
+  const [data, setData] = useState<PatientBrainRecord | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  if (!data) {
+  useEffect(() => {
+    const patientId = user?.patientId ?? DEFAULT_PATIENT_ID;
+    setLoading(true);
+    setError(null);
+    fetchPatientBrainScan(patientId)
+      .then((record) => {
+        if (!record) {
+          setError("No brain scan data found.");
+        }
+        setData(record);
+      })
+      .catch((err: Error) => setError(err.message))
+      .finally(() => setLoading(false));
+  }, [user]);
+
+  if (loading) {
     return (
       <DashboardLayout>
-        <p className="text-sm text-red-500">No brain scan data found.</p>
+        <LoadingState message="Loading your brain scan..." />
+      </DashboardLayout>
+    );
+  }
+
+  if (error || !data) {
+    return (
+      <DashboardLayout>
+        <ErrorState message={error ?? "No brain scan data found."} />
       </DashboardLayout>
     );
   }
@@ -63,13 +94,13 @@ const PatientBrainDashboard: React.FC = () => {
         </div>
 
         <div className="bg-white rounded-2xl shadow-sm border p-4">
-          <h2 className="text-sm font-semibold">Doctor’s Summary</h2>
+          <h2 className="text-sm font-semibold">Doctor's Summary</h2>
           <p className="mt-1 text-[11px] text-slate-700">{data.doctorSummary}</p>
 
           <h3 className="mt-3 text-xs font-semibold">Detailed Notes</h3>
           <ul className="list-disc list-inside mt-1 text-[11px] text-slate-700 space-y-1">
-            {data.doctorNotes.map((n, i) => (
-              <li key={i}>{n}</li>
+            {data.doctorNotes.map((note) => (
+              <li key={note}>{note}</li>
             ))}
           </ul>
         </div>
