@@ -66,7 +66,7 @@ const DoctorPatientsList: React.FC = () => {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search by ID or name"
-            className="w-64 rounded-lg border border-slate-200 px-3 py-2 text-sm shadow-sm"
+            className="w-full md:w-64 rounded-lg border border-slate-200 px-3 py-2 text-sm shadow-sm"
           />
         </div>
 
@@ -96,6 +96,8 @@ const DoctorPatientsList: React.FC = () => {
               )}
 
               {filteredPatients.map((patient) => {
+                const hasBrain = patient.hasBrain ?? !!patient.brainScanId;
+                const hasHeart = patient.hasHeart ?? !!patient.heartScanId;
                 const lastScan =
                   patient.lastBrainScan ?? patient.lastHeartScan ?? "N/A";
                 return (
@@ -122,31 +124,72 @@ const DoctorPatientsList: React.FC = () => {
                       {patient.age ?? "N/A"}
                     </td>
                     <td className="px-4 py-3">
-                      <span className="rounded-full bg-orange-50 px-3 py-1 text-xs font-medium text-orange-700">
-                        {patient.brainStress}
-                      </span>
+                      {hasBrain ? (
+                        <span className="rounded-full bg-orange-50 px-3 py-1 text-xs font-medium text-orange-700">
+                          {patient.brainStress}
+                        </span>
+                      ) : (
+                        <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600">
+                          No data
+                        </span>
+                      )}
                     </td>
                     <td className="px-4 py-3">
-                      <span className="rounded-full bg-rose-50 px-3 py-1 text-xs font-medium text-rose-700">
-                        {patient.heartSeverity}
-                      </span>
+                      {hasHeart ? (
+                        <span className="rounded-full bg-rose-50 px-3 py-1 text-xs font-medium text-rose-700">
+                          {patient.heartSeverity}
+                        </span>
+                      ) : (
+                        <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600">
+                          No data
+                        </span>
+                      )}
                     </td>
                     <td className="px-4 py-3 text-slate-700">{lastScan}</td>
                     <td className="px-4 py-3 text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        <Link to={`/dashboard/doctor/brain/${patient.id}`}>
+                      <div className="flex items-center justify-end gap-2 flex-wrap">
+                        <Link to={`/dashboard/doctor/upload/${patient.id}`}>
+                          <Button variant="secondary" className="border border-slate-200 text-xs">
+                            Upload Scan
+                          </Button>
+                        </Link>
+                        <Link to={`/dashboard/doctor/history/${patient.id}`}>
+                          <Button variant="secondary" className="border border-slate-200 text-xs">
+                            History
+                          </Button>
+                        </Link>
+                        {hasBrain ? (
+                          <Link to={`/dashboard/doctor/brain/${patient.id}`}>
+                            <Button
+                              variant="secondary"
+                              className="border border-slate-200 text-xs"
+                            >
+                              Brain dashboard
+                            </Button>
+                          </Link>
+                        ) : (
                           <Button
                             variant="secondary"
                             className="border border-slate-200 text-xs"
+                            disabled
                           >
                             Brain dashboard
                           </Button>
-                        </Link>
-                        <Link to={`/dashboard/doctor/heart/${patient.id}`}>
-                          <Button className="bg-sky-600 hover:bg-sky-700 text-xs">
+                        )}
+                        {hasHeart ? (
+                          <Link to={`/dashboard/doctor/heart/${patient.id}`}>
+                            <Button className="bg-sky-600 hover:bg-sky-700 text-xs">
+                              Heart dashboard
+                            </Button>
+                          </Link>
+                        ) : (
+                          <Button
+                            className="bg-slate-200 text-slate-500 text-xs"
+                            disabled
+                          >
                             Heart dashboard
                           </Button>
-                        </Link>
+                        )}
                       </div>
                     </td>
                   </tr>

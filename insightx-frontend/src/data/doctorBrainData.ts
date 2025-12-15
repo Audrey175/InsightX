@@ -9,12 +9,12 @@ export type DoctorBrainScanRecord = DoctorBrainScan & {
   lastScanDate?: string;
 };
 
-export const doctorBrainScans: DoctorBrainScanRecord[] = patients.map(
-  (patient) => ({
+export const doctorBrainScans: DoctorBrainScanRecord[] = patients
+  .filter((patient) => patient.doctor?.brain)
+  .map((patient) => ({
     patientId: patient.id,
     patientName: patient.name,
     avatar: patient.avatar,
     lastScanDate: patient.lastBrainScan,
-    ...patient.doctor.brain,
-  })
-);
+    ...patient.doctor!.brain!,
+  }));

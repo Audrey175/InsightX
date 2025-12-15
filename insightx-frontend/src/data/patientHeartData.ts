@@ -8,11 +8,11 @@ export type PatientHeartRecord = PatientHeartView & {
   avatar: string;
 };
 
-export const patientHeartViews: PatientHeartRecord[] = patients.map(
-  (patient) => ({
+export const patientHeartViews: PatientHeartRecord[] = patients
+  .filter((patient) => patient.patient?.heart)
+  .map((patient) => ({
     patientId: patient.id,
     name: patient.name,
     avatar: patient.avatar,
-    ...patient.patient.heart,
-  })
-);
+    ...patient.patient!.heart!,
+  }));
