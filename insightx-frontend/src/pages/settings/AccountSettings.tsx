@@ -1,19 +1,33 @@
-import React from "react";
-import DashboardLayout from "../../layouts/DashboardLayout";
+import { useAuth } from "../../context/AuthContext";
 
-const AccountSettings: React.FC = () => {
+export default function AccountSettings() {
+  const { user, logout } = useAuth();
+
   return (
-    <DashboardLayout>
-      <div className="space-y-2">
-        <h1 className="text-lg font-semibold text-slate-900">
-          Account Settings
-        </h1>
-        <p className="text-sm text-slate-600">
-          Settings will be available in a future release.
-        </p>
-      </div>
-    </DashboardLayout>
-  );
-};
+    <div className="bg-white border rounded-lg p-5 space-y-4">
+      <h1 className="text-lg font-semibold">Account</h1>
 
-export default AccountSettings;
+      <div className="text-sm text-slate-600">
+        <div>
+          <span className="font-medium">Name:</span>{" "}
+          {user?.fullName || "—"}
+        </div>
+        <div>
+          <span className="font-medium">Email:</span> {user?.email || "—"}
+        </div>
+        <div>
+          <span className="font-medium">Role:</span> {user?.role || "—"}
+        </div>
+      </div>
+
+      <div className="pt-2 border-t">
+        <button
+          onClick={logout}
+          className="px-3 py-2 rounded bg-slate-900 text-white"
+        >
+          Sign out
+        </button>
+      </div>
+    </div>
+  );
+}

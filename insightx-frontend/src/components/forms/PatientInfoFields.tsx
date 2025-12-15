@@ -17,7 +17,7 @@ const PatientInfoFields: React.FC<Props> = ({ values, errors, onChange }) => {
       <h2 className="font-medium mb-2">Patient Information</h2>
       <div>
         <input
-          name="patientID"
+          name="patientId"
           className="border p-2 rounded-lg w-full"
           placeholder="Patient ID"
           value={values.patientId}

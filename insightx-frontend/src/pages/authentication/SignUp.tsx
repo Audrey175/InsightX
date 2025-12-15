@@ -112,8 +112,8 @@ const SignUp: React.FC = () => {
     }
 
     if (currentRole === "patient") {
-      if (!vals.professionalId.trim())
-        newErrors.professionalId = "Professional ID is required.";
+      if (!vals.patientId?.trim())
+        newErrors.patientId = "Patient ID is required.";
     }
 
     if (!vals.acceptedTerms)

@@ -1,17 +1,29 @@
-import React from "react";
+import { useState } from "react";
 import { useAuth } from "../../context/AuthContext";
+import { getSidebarNav, type Role } from "../../lib/nav";
+import MobileSidebar from "./MobileSidebar";
 
 const Topbar: React.FC = () => {
   const { user, logout } = useAuth();
+  const [open, setOpen] = useState(false);
+
+  const role = (user?.role ?? "patient") as Role;
+  const nav = getSidebarNav(role);
 
   return (
-    <header className="h-16 bg-white border-b flex items-center justify-between px-4 md:px-6">
-      <div className="text-sm font-semibold text-slate-800">
-        Welcome{user ? `, ${user.fullName}` : ""} 👋
-      </div>
+    <div className="flex items-center justify-between px-4 py-3 border-b bg-white">
+      <button
+        className="md:hidden border rounded px-2 py-1"
+        onClick={() => setOpen(true)}
+        aria-label="Open navigation"
+      >
+        ☰
+      </button>
 
-      {user && (
-        <div className="flex items-center gap-3 text-xs text-slate-600">
+      <div className="font-semibold">InsightX</div>
+
+      {user ? (
+        <div className="hidden md:flex items-center gap-3 text-xs text-slate-600">
           <span className="px-2 py-1 rounded-full bg-slate-100">
             {user.role.toUpperCase()}
           </span>
@@ -22,8 +34,17 @@ const Topbar: React.FC = () => {
             Sign out
           </button>
         </div>
+      ) : (
+        <div className="w-12" />
       )}
-    </header>
+
+      <MobileSidebar
+        open={open}
+        onClose={() => setOpen(false)}
+        sections={nav.sections}
+        bottomItems={nav.bottomItems}
+      />
+    </div>
   );
 };
 

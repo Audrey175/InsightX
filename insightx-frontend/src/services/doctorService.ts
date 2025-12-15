@@ -12,6 +12,7 @@ import {
   doctorHeartScans,
   type DoctorHeartScanRecord,
 } from "../data/doctorHeartData";
+import { getLatestDoneSession } from "./localScanStore";
 import { USE_MOCK, simulateRequest, apiClient } from "./api";
 
 export type DoctorPatientListItem = {
@@ -19,12 +20,14 @@ export type DoctorPatientListItem = {
   name: string;
   avatar: string;
   age?: number;
-  brainStress: StressLevel;
-  brainScanId: string;
-  heartSeverity: InjurySeverity;
-  heartScanId: string;
+  brainStress?: StressLevel;
+  brainScanId?: string;
+  heartSeverity?: InjurySeverity;
+  heartScanId?: string;
   lastBrainScan?: string;
   lastHeartScan?: string;
+  hasBrain?: boolean;
+  hasHeart?: boolean;
 };
 
 const findPatient = (patientId: string) =>
@@ -48,9 +51,21 @@ export async function fetchDoctorBrainScan(
 ): Promise<DoctorBrainScanRecord | null> {
   if (USE_MOCK) {
     return simulateRequest(() => {
-      const scan = doctorBrainScans.find(
-        (item) => item.patientId === patientId
-      );
+      const patient = findPatient(patientId);
+      const session = getLatestDoneSession(patientId, "brain");
+      const sessionDoctor = session?.data?.doctor as DoctorBrainScanRecord | undefined;
+      if (sessionDoctor) {
+        const base = sessionDoctor as Partial<DoctorBrainScanRecord>;
+        return {
+          ...base,
+          patientId,
+          patientName: base.patientName ?? patient?.name ?? "Unknown patient",
+          avatar: base.avatar ?? patient?.avatar ?? "NA",
+          lastScanDate: base.lastScanDate ?? session?.createdAt,
+          scanId: base.scanId ?? (session?.id ? `B-SESSION-${session.id}` : "B-SESSION"),
+        } as DoctorBrainScanRecord;
+      }
+      const scan = doctorBrainScans.find((item) => item.patientId === patientId);
       return scan ?? null;
     });
   }
@@ -66,9 +81,21 @@ export async function fetchDoctorHeartScan(
 ): Promise<DoctorHeartScanRecord | null> {
   if (USE_MOCK) {
     return simulateRequest(() => {
-      const scan = doctorHeartScans.find(
-        (item) => item.patientId === patientId
-      );
+      const patient = findPatient(patientId);
+      const session = getLatestDoneSession(patientId, "heart");
+      const sessionDoctor = session?.data?.doctor as DoctorHeartScanRecord | undefined;
+      if (sessionDoctor) {
+        const base = sessionDoctor as Partial<DoctorHeartScanRecord>;
+        return {
+          ...base,
+          patientId,
+          patientName: base.patientName ?? patient?.name ?? "Unknown patient",
+          avatar: base.avatar ?? patient?.avatar ?? "NA",
+          lastScanDate: base.lastScanDate ?? session?.createdAt,
+          scanId: base.scanId ?? (session?.id ? `H-SESSION-${session.id}` : "H-SESSION"),
+        } as DoctorHeartScanRecord;
+      }
+      const scan = doctorHeartScans.find((item) => item.patientId === patientId);
       return scan ?? null;
     });
   }
@@ -82,18 +109,34 @@ export async function fetchDoctorHeartScan(
 export async function fetchDoctorPatients(): Promise<DoctorPatientListItem[]> {
   if (USE_MOCK) {
     return simulateRequest<DoctorPatientListItem[]>(() =>
-      patients.map<DoctorPatientListItem>((patient) => ({
-        id: patient.id,
-        name: patient.name,
-        avatar: patient.avatar,
-        age: patient.age,
-        brainStress: patient.doctor.brain.stress,
-        brainScanId: patient.doctor.brain.scanId,
-        heartSeverity: patient.doctor.heart.injury.severity,
-        heartScanId: patient.doctor.heart.scanId,
-        lastBrainScan: patient.lastBrainScan,
-        lastHeartScan: patient.lastHeartScan,
-      }))
+      patients.map<DoctorPatientListItem>((patient) => {
+        const brainSession = getLatestDoneSession(patient.id, "brain");
+        const heartSession = getLatestDoneSession(patient.id, "heart");
+
+        const brainScan =
+          (brainSession?.data?.doctor as DoctorBrainScanRecord | undefined) ??
+          patient.doctor?.brain;
+        const heartScan =
+          (heartSession?.data?.doctor as DoctorHeartScanRecord | undefined) ??
+          patient.doctor?.heart;
+
+        return {
+          id: patient.id,
+          name: patient.name,
+          avatar: patient.avatar,
+          age: patient.age,
+          brainStress: (brainScan as DoctorBrainScanRecord | undefined)?.stress,
+          brainScanId: (brainScan as any)?.scanId,
+          heartSeverity: (heartScan as DoctorHeartScanRecord | undefined)?.injury?.severity as
+            | InjurySeverity
+            | undefined,
+          heartScanId: (heartScan as any)?.scanId,
+          lastBrainScan: brainSession?.createdAt ?? patient.lastBrainScan,
+          lastHeartScan: heartSession?.createdAt ?? patient.lastHeartScan,
+          hasBrain: !!brainScan,
+          hasHeart: !!heartScan,
+        };
+      })
     );
   }
 

@@ -8,17 +8,17 @@ type Props = {
 
 const DashboardLayout: React.FC<Props> = ({ children }) => {
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col md:flex-row">
+    <div className="min-h-screen bg-slate-50 flex flex-col md:flex-row overflow-x-hidden">
       {/* Sidebar */}
       <Sidebar />
 
       {/* Main area */}
-      <div className="flex-1 flex flex-col">
+      <div className="flex-1 flex flex-col min-w-0">
         <Topbar />
-        <main className="flex-1 px-4 py-6 md:px-6">{children}</main>
+        <main className="flex-1 px-4 py-4 md:px-6 overflow-y-auto">{children}</main>
 
         <footer className="border-t bg-white text-xs text-slate-500 px-6 py-3 text-right">
-          2025 © InsightX, All Rights Reserved
+          2025 Ac InsightX, All Rights Reserved
         </footer>
       </div>
     </div>

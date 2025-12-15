@@ -5,11 +5,16 @@ import { ShieldCheck, ScanLine, Globe2, Eye } from "lucide-react";
 import { Link } from "react-router-dom";
 import BrainHero from "../assets/brainhome.png";
 import Researchers from "../assets/researchers.png";
+import { useAuth } from "../context/AuthContext";
+import { getRoleHomePath } from "../lib/paths";
 
 import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
 
 const LandingPage: React.FC = () => {
+  const { user } = useAuth();
+  const dashTo = user ? getRoleHomePath(user.role) : "/login";
+
   return (
     <div className="min-h-screen flex flex-col bg-slate-50 text-slate-900">
 
@@ -37,11 +42,36 @@ const LandingPage: React.FC = () => {
               hardware—supporting clinicians in resource-limited environments.
             </p>
 
-            <Link to="/login">
-              <Button className="mt-2 w-fit rounded-md bg-cyan-500 px-7 py-2.5 text-sm font-semibold hover:bg-cyan-400">
-                Login
-              </Button>
-            </Link>
+            <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+              {user ? (
+                <Link to={dashTo}>
+                  <Button className="w-full sm:w-auto rounded-md bg-cyan-500 px-7 py-2.5 text-sm font-semibold hover:bg-cyan-400">
+                    Go to Dashboard
+                  </Button>
+                </Link>
+              ) : (
+                <>
+                  <Link to="/login">
+                    <Button className="w-full sm:w-auto rounded-md bg-cyan-500 px-7 py-2.5 text-sm font-semibold hover:bg-cyan-400">
+                      Login
+                    </Button>
+                  </Link>
+                  <Link to="/choose-role">
+                    <Button
+                      variant="secondary"
+                      className="w-full sm:w-auto rounded-md px-7 py-2.5 text-sm font-semibold"
+                    >
+                      Get Started
+                    </Button>
+                  </Link>
+                </>
+              )}
+              {user && (
+                <span className="text-xs text-cyan-50">
+                  Signed in as {user.role}
+                </span>
+              )}
+            </div>
           </div>
 
           {/* RIGHT SIDE HERO IMAGE */}
