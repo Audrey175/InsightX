@@ -1,6 +1,6 @@
 from sqlalchemy import Column, Integer, String, ForeignKey, Float
 from sqlalchemy.orm import relationship
-from app.database import Base
+from backend.data import Base
 
 class Scan(Base):
     __tablename__ = "scans"

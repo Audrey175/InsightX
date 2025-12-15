@@ -1,76 +1,91 @@
+// src/services/profileService.ts
 import { USE_MOCK, simulateRequest, apiClient } from "./api";
 import type { AuthUser } from "../types/auth";
-import { patients } from "../data/fakeDatabase";
 
-export type PatientProfile = {
-  id: string;
-  fullName: string;
-  age: number;
-  lastScanDate: string;
-  primaryDoctorName: string;
-};
-
-export type DoctorProfile = {
+export interface DoctorProfile {
   id: string;
   fullName: string;
   hospital: string;
   department: string;
   totalPatients: number;
+  avatarUrl?: string | null; // new
+}
+
+export interface PatientProfile {
+  id: string;
+  fullName: string;
+  age: number;
+  lastScanDate: string;
+  primaryDoctorName: string;
+  avatarUrl?: string | null; // new
+}
+
+// --- MOCK STORAGE (kept in memory for now) ---
+
+let mockDoctorProfile: DoctorProfile = {
+  id: "D-0001",
+  fullName: "Dr. Alex Nguyen",
+  hospital: "InsightX General Hospital",
+  department: "Neurosurgery",
+  totalPatients: 24,
+  avatarUrl: null,
 };
 
+let mockPatientProfile: PatientProfile = {
+  id: "P-0001",
+  fullName: "Jane Smith",
+  age: 32,
+  lastScanDate: "2025-11-12",
+  primaryDoctorName: "Dr. Alex Nguyen",
+  avatarUrl: null,
+};
+
+// --- SERVICE IMPLEMENTATION ---
+
 export const profileService = {
-  async getPatientProfile(user: AuthUser): Promise<PatientProfile> {
+  async getDoctorProfile(_user: AuthUser): Promise<DoctorProfile> {
     if (USE_MOCK) {
-      return simulateRequest<PatientProfile>(() => {
-        if (!user.patientId) {
-          throw new Error("No patient profile available.");
-        }
-
-        const patient = patients.find((p) => p.id === user.patientId);
-        if (!patient) {
-          throw new Error("Patient not found.");
-        }
-
-        const profile: PatientProfile = {
-          id: patient.id,
-          fullName: patient.name,
-          age: patient.age ?? 0,
-          lastScanDate: patient.lastBrainScan ?? patient.lastHeartScan ?? "N/A",
-          primaryDoctorName: "Assigned doctor",
-        };
-
-        return profile;
-      });
+      return simulateRequest(() => mockDoctorProfile);
     }
 
-    const res = await apiClient.get<PatientProfile>("/patient/me/profile");
+    const res = await apiClient.get<DoctorProfile>("/profile/doctor");
     return res.data;
   },
 
-  async getDoctorProfile(user: AuthUser): Promise<DoctorProfile> {
+  async updateDoctorProfile(
+    updates: Partial<DoctorProfile>
+  ): Promise<DoctorProfile> {
     if (USE_MOCK) {
-      return simulateRequest<DoctorProfile>(() => {
-        if (!user.doctorId) {
-          throw new Error("No doctor profile available.");
-        }
-
-        const doctorPatients = patients.filter(
-          (patient) => patient.doctorId === user.doctorId
-        );
-
-        const profile: DoctorProfile = {
-          id: user.doctorId,
-          fullName: user.fullName,
-          hospital: "InsightX Medical Center",
-          department: "Neuroscience and Cardiology",
-          totalPatients: doctorPatients.length,
-        };
-
-        return profile;
+      return simulateRequest(() => {
+        mockDoctorProfile = { ...mockDoctorProfile, ...updates };
+        return mockDoctorProfile;
       });
     }
 
-    const res = await apiClient.get<DoctorProfile>("/doctor/me/profile");
+    const res = await apiClient.put<DoctorProfile>("/profile/doctor", updates);
+    return res.data;
+  },
+
+  async getPatientProfile(_user: AuthUser): Promise<PatientProfile> {
+    if (USE_MOCK) {
+      return simulateRequest(() => mockPatientProfile);
+    }
+
+    const res = await apiClient.get<PatientProfile>("/profile/patient");
+    return res.data;
+  },
+
+  async updatePatientProfile(
+    updates: Partial<PatientProfile>
+  ): Promise<PatientProfile> {
+    if (USE_MOCK) {
+      return simulateRequest(() => {
+        mockPatientProfile = { ...mockPatientProfile, ...updates };
+        return mockPatientProfile;
+      });
+    }
+
+    const res = await apiClient.put<PatientProfile>("/profile/patient", updates);
     return res.data;
   },
 };

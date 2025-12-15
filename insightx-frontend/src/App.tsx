@@ -1,9 +1,9 @@
 import { Routes, Route, Navigate } from "react-router-dom";
 
 import LandingPage from "./pages/LandingPage";
-import Login from "./pages/Login";
-import ChooseRole from "./pages/ChooseRole";
-import SignUp from "./pages/SignUp";
+import Login from "./pages/authentication/Login";
+import ChooseRole from "./pages/authentication/ChooseRole";
+import SignUp from "./pages/authentication/SignUp";
 
 // dashboards
 import GeneralDashboard from "./pages/dashboard/GeneralDashboard";

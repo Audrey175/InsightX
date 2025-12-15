@@ -60,7 +60,7 @@ const Sidebar: React.FC = () => {
                 `${linkBase} ${isActive ? active : ""}`
               }
             >
-              <span>Doctor - Brain</span>
+              <span>Brain</span>
             </NavLink>
             <NavLink
               to="/dashboard/doctor/heart"
@@ -68,7 +68,7 @@ const Sidebar: React.FC = () => {
                 `${linkBase} ${isActive ? active : ""}`
               }
             >
-              <span>Doctor - Heart</span>
+              <span>Heart</span>
             </NavLink>
             <NavLink
               to="/profile/doctor"
@@ -92,7 +92,7 @@ const Sidebar: React.FC = () => {
                 `${linkBase} ${isActive ? active : ""}`
               }
             >
-              <span>Patient - Brain</span>
+              <span>Brain</span>
             </NavLink>
             <NavLink
               to="/dashboard/patient/heart"
@@ -100,7 +100,7 @@ const Sidebar: React.FC = () => {
                 `${linkBase} ${isActive ? active : ""}`
               }
             >
-              <span>Patient - Heart</span>
+              <span>Heart</span>
             </NavLink>
             <NavLink
               to="/profile/patient"
