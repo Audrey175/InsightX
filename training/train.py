@@ -68,9 +68,9 @@ for epoch in range(EPOCHS):
 
         train_loss += loss.item()
 
-    # -----------------------------
-    # VALIDATION + CONFUSION MATRIX
-    # -----------------------------
+#     # -----------------------------
+#     # VALIDATION + CONFUSION MATRIX
+#     # -----------------------------
     model.eval()
     correct, total = 0, 0
 
@@ -100,7 +100,7 @@ for epoch in range(EPOCHS):
     print("\nConfusion Matrix:")
     print(cm)
 
-    # Optional: Print with labels
+    # Print with labels
     print("\nLabeled Confusion Matrix:")
     print("     " + "  ".join(f"{c[:6]:>7}" for c in CLASS_NAMES))
     for i, row in enumerate(cm):
