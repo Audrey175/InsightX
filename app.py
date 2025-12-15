@@ -4,6 +4,8 @@ from fastapi import FastAPI
 # from app.routers.scan_router import router as scan_router
 # from app.routers.dashboard_router import router as dashboard_router
 from backend.routes.predict import router as prediction_router
+from fastapi.middleware.cors import CORSMiddleware
+
 
 
 # Base.metadata.create_all(bind=engine)
@@ -11,6 +13,13 @@ from backend.routes.predict import router as prediction_router
 app = FastAPI(
     title="Medical Imaging System",
     description="MRI/X-ray upload, 3D reconstruction, injury detection, dashboards"
+)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],   
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 app.include_router(prediction_router)
 @app.get("/")
