@@ -1,6 +1,6 @@
 # backend/chatbot/routes/chatbot_router.py
 from fastapi import APIRouter, HTTPException
-from ..service.rag_service import answer_query
+# from ..service.rag_service import answer_query
 from pydantic import BaseModel
 
 router = APIRouter()
