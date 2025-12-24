@@ -1,111 +1,70 @@
 import torch
-import torch.nn as nn
-import torch.optim as optim
-from torchvision import datasets, transforms, models
 from torch.utils.data import DataLoader
-from tqdm import tqdm
-from sklearn.metrics import confusion_matrix
-import numpy as np
 
-NUM_CLASSES = 4       
-BATCH_SIZE = 32
-EPOCHS = 20
-LR = 1e-4
-MODEL_PATH = "efficientnet_mri.pth"
+from dataset.brats_dataset import BraTSDataset
+from model.unet_model import UNet
 
-DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
-print("Using:", DEVICE)
+# Loss function 
+def dice_loss(pred, target, smooth=1e-6):
+    pred = torch.sigmoid(pred)
+    intersection = (pred * target).sum(dim=(2,3))
+    union = pred.sum(dim=(2,3)) + target.sum(dim=(2,3))
+    dice = (2. * intersection + smooth) / (union + smooth)
+    return 1 - dice.mean()
 
-# Class names for confusion matrix
-CLASS_NAMES = ["Glioma", "Meningioma", "Notumor", "Pituitary"]
+def main():
+    # Dataset & DataLoader
+    dataset = BraTSDataset("brats")
 
-train_tfms = transforms.Compose([
-    transforms.Resize((224, 224)),
-    transforms.RandomHorizontalFlip(),
-    transforms.RandomRotation(10),
-    transforms.ToTensor(),
-    transforms.Normalize([0.485, 0.456, 0.406],
-                         [0.229, 0.224, 0.225])
-])
+    loader = DataLoader(
+        dataset,
+        batch_size=8,
+        shuffle=True,
+        num_workers=4,
+        pin_memory=True
+    )
 
-val_tfms = transforms.Compose([
-    transforms.Resize((224, 224)),
-    transforms.ToTensor(),
-    transforms.Normalize([0.485, 0.456, 0.406],
-                         [0.229, 0.224, 0.225])
-])
+    # Model (Section 3)
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    print("Using device:", device)
 
-train_data = datasets.ImageFolder("dataset/train", train_tfms)
-val_data = datasets.ImageFolder("dataset/val", val_tfms)
+    if device == "cuda":
+        print("GPU:", torch.cuda.get_device_name(0))
 
-train_loader = DataLoader(train_data, batch_size=BATCH_SIZE, shuffle=True)
-val_loader = DataLoader(val_data, batch_size=BATCH_SIZE)
+    model = UNet(in_channels=4, num_classes=3).to(device)
 
-model = models.efficientnet_b0(pretrained=True)
+    optimizer = torch.optim.Adam(model.parameters(), lr=1e-4)
 
-for param in model.features.parameters():
-    param.requires_grad = False
 
-model.classifier[1] = nn.Linear(1280, NUM_CLASSES)
-model = model.to(DEVICE)
+    # Training loop
+    epochs = 30
 
-criterion = nn.CrossEntropyLoss()
-optimizer = optim.Adam(model.parameters(), lr=LR)
+    for epoch in range(epochs):
+        model.train()
+        total_loss = 0
 
-for epoch in range(EPOCHS):
-    model.train()
-    train_loss = 0
+        for i, (images, masks) in enumerate(loader):
+            if i % 100 == 0:
+                print(f"Epoch {epoch+1}, Batch {i}/{len(loader)}")
+            # Normalize MRI per sample
+            images = (images - images.mean()) / (images.std() + 1e-5)
 
-    for imgs, labels in tqdm(train_loader):
-        imgs, labels = imgs.to(DEVICE), labels.to(DEVICE)
+            images = images.to(device, non_blocking=True)
+            masks  = masks.to(device, non_blocking=True)
 
-        optimizer.zero_grad()
-        outputs = model(imgs)
-        loss = criterion(outputs, labels)
+            preds = model(images)
+            loss = dice_loss(preds, masks)
 
-        loss.backward()
-        optimizer.step()
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
 
-        train_loss += loss.item()
+            total_loss += loss.item()
 
-    # -----------------------------
-    # VALIDATION + CONFUSION MATRIX
-    # -----------------------------
-    model.eval()
-    correct, total = 0, 0
+        avg_loss = total_loss / len(loader)
+        print(f"Epoch [{epoch+1}/{epochs}] - Loss: {avg_loss:.4f}")
 
-    all_preds = []
-    all_labels = []
-
-    with torch.no_grad():
-        for imgs, labels in val_loader:
-            imgs, labels = imgs.to(DEVICE), labels.to(DEVICE)
-            outputs = model(imgs)
-            _, preds = torch.max(outputs, 1)
-
-            total += labels.size(0)
-            correct += (preds == labels).sum().item()
-
-            # Store predictions for confusion matrix
-            all_preds.extend(preds.cpu().numpy())
-            all_labels.extend(labels.cpu().numpy())
-
-    val_acc = correct / total * 100
-
-    # Compute confusion matrix
-    cm = confusion_matrix(all_labels, all_preds)
-
-    print(f"\nEpoch {epoch+1}/{EPOCHS}")
-    print(f"Loss: {train_loss:.4f} | Val Acc: {val_acc:.2f}%")
-    print("\nConfusion Matrix:")
-    print(cm)
-
-    # Optional: Print with labels
-    print("\nLabeled Confusion Matrix:")
-    print("     " + "  ".join(f"{c[:6]:>7}" for c in CLASS_NAMES))
-    for i, row in enumerate(cm):
-        print(f"{CLASS_NAMES[i][:7]:<7} {row}")
-
-# Save final model
-torch.save(model.state_dict(), MODEL_PATH)
-print("Model saved:", MODEL_PATH)
+    torch.save(model.state_dict(), "unet_brats.pth")
+    print("Model saved!")
+if __name__ == "__main__":
+    main()
