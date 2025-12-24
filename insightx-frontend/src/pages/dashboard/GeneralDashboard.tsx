@@ -1,51 +1,18 @@
-import React, { useEffect, useState } from "react";
+import React from "react";
 import DashboardLayout from "../../layouts/DashboardLayout";
 import StatCard from "../../components/dashboard/StatCard";
 import ConsultationByDepartmentChart from "../../components/dashboard/ConsultationByDepartmentChart";
 import DiseaseCategoryChart from "../../components/dashboard/DiseaseCategoryChart";
-import {
-  fetchDoctorPatients,
-  type DoctorPatientListItem,
-} from "../../services/doctorService";
-import { LoadingState } from "../../components/ui/LoadingState";
-import { ErrorState } from "../../components/ui/ErrorState";
+import { patients } from "../../data/fakeDatabase";
 
 const GeneralDashboard: React.FC = () => {
-  const [patients, setPatients] = useState<DoctorPatientListItem[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    setLoading(true);
-    fetchDoctorPatients()
-      .then(setPatients)
-      .catch((err: Error) => setError(err.message))
-      .finally(() => setLoading(false));
-  }, []);
-
   const totalPatients = patients.length;
   const totalBrainCases = patients.length; // 1 brain scan per patient
   const totalHeartCases = patients.length; // 1 heart scan per patient
 
   const highRiskCount =
-    patients.filter((p) => p.brainStress === "High").length +
-    patients.filter((p) => p.heartSeverity === "High").length;
-
-  if (loading) {
-    return (
-      <DashboardLayout>
-        <LoadingState message="Loading dashboard..." />
-      </DashboardLayout>
-    );
-  }
-
-  if (error) {
-    return (
-      <DashboardLayout>
-        <ErrorState message={`Unable to load dashboard data: ${error}`} />
-      </DashboardLayout>
-    );
-  }
+    patients.filter((p) => p.doctor.brain.stress === "High").length +
+    patients.filter((p) => p.doctor.heart.injury.severity === "High").length;
 
   return (
     <DashboardLayout>
@@ -54,7 +21,7 @@ const GeneralDashboard: React.FC = () => {
           General Dashboard
         </h1>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <StatCard title="Total Patients" value={totalPatients} change="+9.5%" />
           <StatCard
             title="Total Brain Cases"

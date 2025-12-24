@@ -60,10 +60,6 @@ export type PatientRecord = {
   id: string;          // P-0001
   name: string;        // Glenn Quagmire
   avatar: string;      // initials like GQ
-  age?: number;
-  lastBrainScan?: string;
-  lastHeartScan?: string;
-  doctorId?: string;
   doctor: {
     brain: DoctorBrainScan;
     heart: DoctorHeartScan;
@@ -82,10 +78,6 @@ export const patients: PatientRecord[] = [
     id: "P-0001",
     name: "Mr. Glenn Quagmire",
     avatar: "GQ",
-    age: 45,
-    lastBrainScan: "2025-01-12",
-    lastHeartScan: "2025-01-10",
-    doctorId: "d-1",
     doctor: {
       brain: {
         scanId: "B-0001",
@@ -96,7 +88,7 @@ export const patients: PatientRecord[] = [
         injury: {
           location: "Left Temporal Lobe",
           type: "Hemorrhagic Contusion",
-          size: "2.4 cm x 1.1 cm",
+          size: "2.4 cm × 1.1 cm",
           edema: "~12 ml",
           imaging: ["MRI T1", "T2", "FLAIR", "DWI"],
         },
@@ -107,8 +99,8 @@ export const patients: PatientRecord[] = [
           "Possible post-traumatic epilepsy (long term)",
         ],
         relatedCases: [
-          "Motorbike chest impact - Mild RV contusion",
-          "Sports collision - Head impact",
+          "Motorbike chest impact · Mild RV contusion",
+          "Sports collision · Head impact",
           "Post-traumatic seizure episodes",
         ],
       },
@@ -130,7 +122,7 @@ export const patients: PatientRecord[] = [
           "Low risk of arrhythmia",
         ],
         relatedCases: [
-          "Sports collision - Chest impact",
+          "Sports collision · Chest impact",
           "Minor car crash trauma",
         ],
       },
@@ -169,10 +161,6 @@ export const patients: PatientRecord[] = [
     id: "P-0002",
     name: "Ms. Lois Griffin",
     avatar: "LG",
-    age: 42,
-    lastBrainScan: "2025-01-05",
-    lastHeartScan: "2025-01-05",
-    doctorId: "d-1",
     doctor: {
       brain: {
         scanId: "B-0002",
@@ -188,12 +176,12 @@ export const patients: PatientRecord[] = [
           imaging: ["CT Head", "MRI T2"],
         },
         risks: [
-          "Headache and attention span reduction for 1-2 weeks",
+          "Headache and attention span reduction for 1–2 weeks",
           "Low risk of long-term complications",
         ],
         relatedCases: [
-          "Minor domestic fall - No loss of consciousness",
-          "Sports injury - Soccer header",
+          "Minor domestic fall · No LOC",
+          "Sports injury · Soccer header",
         ],
       },
       heart: {
@@ -210,7 +198,7 @@ export const patients: PatientRecord[] = [
           imaging: ["Echo", "ECG"],
         },
         risks: ["Low global cardiovascular risk"],
-        relatedCases: ["Routine checkup - No abnormalities"],
+        relatedCases: ["Routine checkup · No abnormalities"],
       },
     },
     patient: {
@@ -222,7 +210,7 @@ export const patients: PatientRecord[] = [
         score: 92,
         doctorSummary: "Your brain scan looks healthy.",
         doctorNotes: [
-          "Mild concussion-like symptoms may occur (headache, fatigue).",
+          "Mild concussion–like symptoms may occur (headache, fatigue).",
           "Rest and proper sleep are recommended.",
         ],
       },
@@ -245,10 +233,6 @@ export const patients: PatientRecord[] = [
     id: "P-0003",
     name: "Mr. Peter Griffin",
     avatar: "PG",
-    age: 48,
-    lastBrainScan: "2024-12-22",
-    lastHeartScan: "2024-12-18",
-    doctorId: "d-2",
     doctor: {
       brain: {
         scanId: "B-0003",
@@ -259,7 +243,7 @@ export const patients: PatientRecord[] = [
         injury: {
           location: "Right Parietal Lobe",
           type: "Ischemic Stroke (subacute)",
-          size: "3.1 cm x 2.2 cm",
+          size: "3.1 cm × 2.2 cm",
           edema: "~18 ml",
           imaging: ["MRI DWI", "FLAIR", "Perfusion"],
         },

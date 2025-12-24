@@ -1,19 +1,15 @@
 import React from "react";
 import { NavLink } from "react-router-dom";
 import Logo from "../../assets/logo/Logo.png";
-import { useAuth } from "../../context/AuthContext";
 
 const Sidebar: React.FC = () => {
-  const { user } = useAuth();
-  const isDoctor = user?.role === "doctor";
-  const isPatient = user?.role === "patient";
-
   const linkBase =
     "flex items-center justify-between px-3 py-2 rounded-lg text-sm text-slate-600 hover:bg-slate-100";
-  const active = "bg-slate-100 text-slate-900 font-semibold";
+  const active =
+    "bg-slate-100 text-slate-900 font-semibold";
 
   return (
-    <aside className="w-64 bg-white border-r flex-col hidden md:flex">
+    <aside className="w-64 bg-white border-r flex flex-col">
       {/* Logo */}
       <div className="h-16 flex items-center px-4 border-b">
         <img src={Logo} className="h-10 w-auto" alt="InsightX" />
@@ -31,114 +27,63 @@ const Sidebar: React.FC = () => {
           >
             <span>Dashboard</span>
           </NavLink>
+        </div>
+
+        <div>
+          <p className="text-xs font-semibold text-slate-500 mb-2">
+            Doctor Views
+          </p>
           <NavLink
-            to="/assistant"
+            to="/dashboard/doctor/brain"
             className={({ isActive }) =>
               `${linkBase} ${isActive ? active : ""}`
             }
           >
-            <span>AI Assistant</span>
+            <span>Doctor · Brain</span>
+          </NavLink>
+          <NavLink
+            to="/dashboard/doctor/heart"
+            className={({ isActive }) =>
+              `${linkBase} ${isActive ? active : ""}`
+            }
+          >
+            <span>Doctor · Heart</span>
           </NavLink>
         </div>
 
-        {isDoctor && (
-          <div>
-            <p className="text-xs font-semibold text-slate-500 mb-2">
-              Doctor Views
-            </p>
-            <NavLink
-              to="/dashboard/doctor/patients"
-              className={({ isActive }) =>
-                `${linkBase} ${isActive ? active : ""}`
-              }
-            >
-              <span>Patients</span>
-            </NavLink>
-            <NavLink
-              to="/dashboard/doctor/brain"
-              className={({ isActive }) =>
-                `${linkBase} ${isActive ? active : ""}`
-              }
-            >
-              <span>Doctor - Brain</span>
-            </NavLink>
-            <NavLink
-              to="/dashboard/doctor/heart"
-              className={({ isActive }) =>
-                `${linkBase} ${isActive ? active : ""}`
-              }
-            >
-              <span>Doctor - Heart</span>
-            </NavLink>
-            <NavLink
-              to="/profile/doctor"
-              className={({ isActive }) =>
-                `${linkBase} ${isActive ? active : ""}`
-              }
-            >
-              <span>Doctor Profile</span>
-            </NavLink>
-          </div>
-        )}
-
-        {isPatient && (
-          <div>
-            <p className="text-xs font-semibold text-slate-500 mb-2">
-              Patient Views
-            </p>
-            <NavLink
-              to="/dashboard/patient/brain"
-              className={({ isActive }) =>
-                `${linkBase} ${isActive ? active : ""}`
-              }
-            >
-              <span>Patient - Brain</span>
-            </NavLink>
-            <NavLink
-              to="/dashboard/patient/heart"
-              className={({ isActive }) =>
-                `${linkBase} ${isActive ? active : ""}`
-              }
-            >
-              <span>Patient - Heart</span>
-            </NavLink>
-            <NavLink
-              to="/profile/patient"
-              className={({ isActive }) =>
-                `${linkBase} ${isActive ? active : ""}`
-              }
-            >
-              <span>Patient Profile</span>
-            </NavLink>
-          </div>
-        )}
+        <div>
+          <p className="text-xs font-semibold text-slate-500 mb-2">
+            Patient Views
+          </p>
+          <NavLink
+            to="/dashboard/patient/brain"
+            className={({ isActive }) =>
+              `${linkBase} ${isActive ? active : ""}`
+            }
+          >
+            <span>Patient · Brain</span>
+          </NavLink>
+          <NavLink
+            to="/dashboard/patient/heart"
+            className={({ isActive }) =>
+              `${linkBase} ${isActive ? active : ""}`
+            }
+          >
+            <span>Patient · Heart</span>
+          </NavLink>
+        </div>
 
         <div>
           <p className="text-xs font-semibold text-slate-500 mb-2">Settings</p>
-          <NavLink
-            to="/settings/account"
-            className={({ isActive }) =>
-              `${linkBase} ${isActive ? active : ""}`
-            }
-          >
+          <button className={linkBase}>
             <span>Account Settings</span>
-          </NavLink>
-          <NavLink
-            to="/settings/system"
-            className={({ isActive }) =>
-              `${linkBase} ${isActive ? active : ""}`
-            }
-          >
+          </button>
+          <button className={linkBase}>
             <span>System Settings</span>
-          </NavLink>
-          <NavLink
-            to="/settings/other"
-            className={({ isActive }) =>
-              `${linkBase} ${isActive ? active : ""}`
-            }
-          >
+          </button>
+          <button className={linkBase}>
             <span>Other Settings</span>
-          </NavLink>
+          </button>
         </div>
 
         <div>
