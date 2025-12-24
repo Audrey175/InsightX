@@ -1,21 +1,20 @@
 from fastapi import APIRouter, UploadFile, File
-from backend.modules.prediction_service import diagnose
-from PIL import Image
-import io
+import tempfile
+import os
+
+from backend.modules.prediction_service import analyze_mri
 
 router = APIRouter()
 
 @router.post("/predict")
-async def predict_image(file: UploadFile = File(...)):
-    # Read image directly from memory
-    image_bytes = await file.read()
-    img = Image.open(io.BytesIO(image_bytes))
+async def predict(file: UploadFile = File(...)):
+    # Save uploaded file temporarily
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".h5") as tmp:
+        tmp.write(await file.read())
+        tmp_path = tmp.name
 
-    # Pass PIL image to diagnose function
-    result = diagnose(img)
+    result = analyze_mri(tmp_path)
 
-    return {
-        "filename": file.filename,
-        "prediction": result["prediction"],
-        "confidence": result["confidence"]
-    }
+    os.remove(tmp_path)
+
+    return result
