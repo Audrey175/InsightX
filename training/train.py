@@ -60,7 +60,6 @@ def main():
             optimizer.step()
 
             total_loss += loss.item()
-
         avg_loss = total_loss / len(loader)
         print(f"Epoch [{epoch+1}/{epochs}] - Loss: {avg_loss:.4f}")
 
