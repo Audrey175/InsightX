@@ -17,7 +17,6 @@ const DoctorBrainDashboard: React.FC = () => {
   const patient = findPatientById(patientId) ?? patients[0];
   const data = getDoctorBrainFor(patient.id)!;
   
-  const [selectedImage, setSelectedImage] = useState <string | null>(null);
   const [prediction, setPrediction] = useState<PredictionResult  | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
@@ -26,7 +25,6 @@ const DoctorBrainDashboard: React.FC = () => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    setSelectedImage(URL.createObjectURL(file));
     setPrediction(null);
     setError(null);
     setLoading(true)
@@ -90,14 +88,6 @@ const DoctorBrainDashboard: React.FC = () => {
               className="text-xs"
             />
 
-            {selectedImage && (
-              <img
-                src={selectedImage}
-                alt="Uploaded MRI"
-                className="mt-2 h-32 object-contain rounded"
-              />
-            )}
-
             {loading && (
               <p className="text-blue-600 font-medium">Analyzing MRI...</p>
             )}
@@ -107,13 +97,41 @@ const DoctorBrainDashboard: React.FC = () => {
             )}
 
             {prediction && (
-              <div className="bg-slate-100 p-4 rounded-xl mt-4">
-                <h3 className="font-semibold text-slate-800 mb-2">Diagnosis Result</h3>
-                <p><strong>Image:</strong> {prediction.filename}</p>
-                <p><strong>Prediction:</strong> {prediction.prediction}</p>
-                <p><strong>Confidence:</strong> {prediction.confidence}%</p>
+              <div className="bg-slate-100 p-4 rounded-xl mt-4 text-sm space-y-1">
+                <h3 className="font-semibold text-slate-800 mb-2">
+                  AI Diagnosis Result
+                </h3>
+
+                <p>
+                  <p><strong>File analyzed:</strong> {prediction.filename}</p>
+                  <strong>Tumor detected:</strong>{" "}
+                  {prediction.tumor_detected ? "Yes" : "No"}
+                </p>
+
+                <p>
+                  <strong>Risk score:</strong>{" "}
+                  {(prediction.risk_score * 100).toFixed(1)}%
+                </p>
+
+                <div className="mt-2">
+                  <strong>Tumor size (pixels):</strong>
+                  <ul className="ml-4 list-disc text-xs">
+                    <li>Core: {prediction.tumor_size_pixels.core}</li>
+                    <li>Enhancing: {prediction.tumor_size_pixels.enhancing}</li>
+                    <li>Whole: {prediction.tumor_size_pixels.whole}</li>
+                  </ul>
+                </div>
+
+                {prediction.tumor_location && (
+                  <p className="mt-2">
+                    <strong>Location:</strong>{" "}
+                    (x={prediction.tumor_location.x.toFixed(1)},
+                    y={prediction.tumor_location.y.toFixed(1)})
+                  </p>
+                )}
               </div>
             )}
+            
           </div>
           <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-4 flex flex-col gap-4">
             <div className="flex justify-between items-center text-xs text-slate-500">

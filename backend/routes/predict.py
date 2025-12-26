@@ -14,7 +14,11 @@ async def predict(file: UploadFile = File(...)):
         tmp_path = tmp.name
 
     result = analyze_mri(tmp_path)
+    return {
+    "filename": file.filename,
+    **result
+    }
 
-    os.remove(tmp_path)
+    # os.remove(tmp_path)
 
-    return result
+    # return result
