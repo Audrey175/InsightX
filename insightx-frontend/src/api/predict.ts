@@ -1,7 +1,16 @@
 export interface PredictionResult {
   filename: string;
-  prediction: string;
-  confidence: number;
+  tumor_detected: boolean;
+  tumor_size_pixels: {
+    core: number;
+    enhancing: number;
+    whole: number;
+  };
+  tumor_location: {
+    x: number;
+    y: number;
+  } | null;
+  risk_score: number;
 }
 
 export async function predictMRI(file: File): Promise<PredictionResult>{
