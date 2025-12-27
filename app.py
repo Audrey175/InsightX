@@ -6,6 +6,8 @@ from fastapi import FastAPI
 from backend.routes.predict import router as prediction_router
 from backend.routes.predict_xray import router as xray_router
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+
 
 
 
@@ -24,6 +26,12 @@ app.add_middleware(
 )
 app.include_router(prediction_router)
 app.include_router(xray_router)
+app.mount(
+    "/heatmaps",
+    StaticFiles(directory="backend/heatmaps"),
+    name="heatmaps"
+)
+
 @app.get("/")
 def root():
     return {"message": "InsightX Diagnosis API is running!"}
