@@ -1,7 +1,9 @@
-import React from "react";
+import React, { useState} from "react";
+import { predictXRay } from "../../api/xray_predict";
+import type { XRayPredictionResult } from "../../api/xray_predict";
 import { useParams, useNavigate } from "react-router-dom";
 import DashboardLayout from "../../layouts/DashboardLayout";
-import HeartHero from "../../assets/researchers.png";
+// import HeartHero from "../../assets/researchers.png";
 import {
   findPatientById,
   getDoctorHeartFor,
@@ -15,6 +17,28 @@ const DoctorHeartDashboard: React.FC = () => {
 
   const patient = findPatientById(patientId) ?? patients[0];
   const data = getDoctorHeartFor(patient.id)!;
+  const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [prediction, setPrediction] = useState<XRayPredictionResult | null>(null);
+  const [loading, setLoading] = useState<boolean>(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleXrayUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const file = e.target.files?.[0];
+  if (!file) return;
+  setSelectedImage(URL.createObjectURL(file));
+  setLoading(true);
+  setError(null);
+
+  try {
+    const result = await predictXRay(file);
+    console.log("X-RAY RESULT:", result);
+    setPrediction(result);
+  } catch {
+    setError("Failed to analyze X-ray.");
+  } finally {
+    setLoading(false);
+  }
+};
 
   return (
     <DashboardLayout>
@@ -53,82 +77,100 @@ const DoctorHeartDashboard: React.FC = () => {
 
         <div className="grid grid-cols-[minmax(0,1.6fr)_minmax(0,1.4fr)] gap-4">
           {/* LEFT */}
-          <div className="bg-white rounded-2xl shadow-sm border p-4 space-y-4">
+          <div className="bg-white rounded-2xl shadow-sm border p-4">
             <div className="flex justify-between text-xs text-slate-500">
-              <span>Cardiac Function</span>
-              <span>3D · Heat map · Raw</span>
+              <h2 className="font-semibold mb-2">Upload Chest X-ray</h2>
             </div>
+            <input
+              type="file"
+              accept="image/*"
+              onChange={handleXrayUpload}
+              className="text-xs"
+            />
 
-            <div className="flex gap-4">
-              <div className="flex-1 flex items-center justify-center">
-                <img
-                  src={HeartHero}
-                  alt="Heart visualization"
-                  className="max-h-56 object-contain"
-                />
-              </div>
+            {selectedImage && ( 
+              <img src={selectedImage} 
+              alt="Uploaded Xray" 
+              className="mt-2 h-32 object-contain rounded" 
+              /> 
+            )}
 
-              <div className="w-60 space-y-3 text-xs">
-                <div className="bg-slate-50 rounded-xl p-3">
-                  <p className="font-semibold mb-1">Heart Metrics</p>
-                  <div className="grid grid-cols-2 text-[11px] text-slate-700 gap-1">
-                    <span>BPM</span>
-                    <span className="text-right">{data.heartRate}</span>
-                    <span>Oxygenation</span>
-                    <span className="text-right">{data.oxygen}%</span>
-                    <span>Blood Pressure</span>
-                    <span className="text-right">{data.pressure}</span>
-                    <span>Condition</span>
-                    <span className="text-right">{data.condition}</span>
-                  </div>
-                </div>
-              </div>
-            </div>
+             {loading && (
+              <p className="text-xs text-slate-500 mt-2">
+                Analyzing X-ray...
+              </p>
+            )}
 
-            <div className="flex gap-3 text-xs">
-              <button className="px-4 py-1.5 rounded-full bg-sky-700 text-white font-medium">
-                3D
-              </button>
-              <button className="px-4 py-1.5 rounded-full bg-slate-100 text-slate-700">
-                Heat map
-              </button>
-              <button className="px-4 py-1.5 rounded-full bg-slate-100 text-slate-700">
-                Raw
-              </button>
-            </div>
+            {error && (
+              <p className="text-xs text-red-500 mt-2">
+                {error}
+              </p>
+            )}
+            
           </div>
 
           {/* RIGHT */}
-          <div className="space-y-4 text-xs">
-            <div className="bg-white rounded-2xl shadow-sm border p-4">
-              <h2 className="font-semibold mb-2">Injury details</h2>
-              <div className="space-y-1 text-[11px]">
-                <p>Region: {data.injury.region}</p>
-                <p>Type: {data.injury.type}</p>
-                <p>Severity: {data.injury.severity}</p>
-                <p>Size: {data.injury.size}</p>
-                <p>Imaging Used: {data.injury.imaging.join(", ")}</p>
+          {prediction && (
+            <div className="bg-white rounded-2xl shadow-sm border p-4 space-y-2 text-xs">
+              <h2 className="font-semibold text-sm">X-ray AI Analysis</h2>
+
+              <p>
+                <strong>File:</strong> {prediction.filename}
+              </p>
+
+              <p>
+                <strong>Modality:</strong> {prediction.modality.toUpperCase()}
+              </p>
+
+              <p>
+                <strong>Prediction:</strong>{" "}
+                <span
+                  className={
+                    prediction.prediction.label === "PNEUMONIA"
+                      ? "text-red-600 font-semibold"
+                      : "text-green-600 font-semibold"
+                  }
+                >
+                  {prediction.prediction.label}
+                </span>
+              </p>
+
+              <p>
+                <strong>Confidence:</strong>{" "}
+                {(prediction.prediction.confidence * 100).toFixed(1)}%
+              </p>
+
+              <p>
+                <strong>Risk Level:</strong>{" "}
+                <span className="capitalize">
+                  {prediction.prediction.risk_level}
+                </span>
+              </p>
+
+              <div className="mt-2">
+                <p className="font-semibold">Probabilities</p>
+                <ul className="ml-3 list-disc">
+                  <li>
+                    NORMAL: {(prediction.prediction.probabilities.NORMAL * 100).toFixed(1)}%
+                  </li>
+                  <li>
+                    PNEUMONIA:{" "}
+                    {(prediction.prediction.probabilities.PNEUMONIA * 100).toFixed(1)}%
+                  </li>
+                </ul>
               </div>
-            </div>
 
-            <div className="bg-white rounded-2xl shadow-sm border p-4">
-              <h2 className="font-semibold mb-2">Potential Risks</h2>
-              <ul className="list-disc list-inside text-[11px] space-y-1">
-                {data.risks.map((r, i) => (
-                  <li key={i}>{r}</li>
-                ))}
-              </ul>
-            </div>
+              <div className="mt-2">
+                <p className="font-semibold">Model Information</p>
+                <p>Architecture: {prediction.model_info.architecture}</p>
+                <p>Version: {prediction.model_info.version}</p>
+              </div>
 
-            <div className="bg-white rounded-2xl shadow-sm border p-4">
-              <h2 className="font-semibold mb-2">Related Cases</h2>
-              <ul className="list-disc list-inside text-[11px] space-y-1">
-                {data.relatedCases.map((c, i) => (
-                  <li key={i}>{c}</li>
-                ))}
-              </ul>
+              <p className="text-[10px] text-slate-400 mt-3">
+                {prediction.disclaimer}
+              </p>
             </div>
-          </div>
+          )}
         </div>
       </div>
     </DashboardLayout>
