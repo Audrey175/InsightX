@@ -4,6 +4,7 @@ from fastapi import FastAPI
 # from app.routers.scan_router import router as scan_router
 # from app.routers.dashboard_router import router as dashboard_router
 from backend.routes.predict import router as prediction_router
+from backend.routes.predict_xray import router as xray_router
 from fastapi.middleware.cors import CORSMiddleware
 
 
@@ -22,6 +23,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 app.include_router(prediction_router)
+app.include_router(xray_router)
 @app.get("/")
 def root():
     return {"message": "InsightX Diagnosis API is running!"}
