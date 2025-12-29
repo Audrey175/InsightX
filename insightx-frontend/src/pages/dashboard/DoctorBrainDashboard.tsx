@@ -1,4 +1,6 @@
-import React from "react";
+import React, { useState} from "react";
+import { predictMRI } from "../../api/predict";
+import type { PredictionResult } from "../../api/predict";
 import { useParams, useNavigate } from "react-router-dom";
 import DashboardLayout from "../../layouts/DashboardLayout";
 import BrainHero from "../../assets/brainhome.png";
@@ -12,9 +14,31 @@ import PatientSelector from "../../components/PatientSelector";
 const DoctorBrainDashboard: React.FC = () => {
   const { patientId } = useParams<{ patientId: string }>();
   const navigate = useNavigate();
-
   const patient = findPatientById(patientId) ?? patients[0];
   const data = getDoctorBrainFor(patient.id)!;
+  
+  const [prediction, setPrediction] = useState<PredictionResult  | null>(null);
+  const [loading, setLoading] = useState<boolean>(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleMRIUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setPrediction(null);
+    setError(null);
+    setLoading(true)
+
+    try {
+    const result = await predictMRI(file);
+    console.log("API RESULT:", result);   // ← DEBUG
+    setPrediction(result);
+    } catch {
+      setError("Failed to analyze MRI. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <DashboardLayout>
@@ -55,6 +79,60 @@ const DoctorBrainDashboard: React.FC = () => {
 
         <div className="grid grid-cols-[minmax(0,1.6fr)_minmax(0,1.4fr)] gap-4">
           {/* LEFT PANEL */}
+          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 mt-2">
+            <h2 className="text-xs font-semibold text-slate-700 mb-2">AI MRI Diagnosis</h2>
+            <input
+              type="file"
+              accept="image/*"
+              onChange={handleMRIUpload}
+              className="text-xs"
+            />
+
+            {loading && (
+              <p className="text-blue-600 font-medium">Analyzing MRI...</p>
+            )}
+
+            {error && (
+              <p className="text-red-600 font-medium">{error}</p>
+            )}
+
+            {prediction && (
+              <div className="bg-slate-100 p-4 rounded-xl mt-4 text-sm space-y-1">
+                <h3 className="font-semibold text-slate-800 mb-2">
+                  AI Diagnosis Result
+                </h3>
+
+                <p>
+                  <p><strong>File analyzed:</strong> {prediction.filename}</p>
+                  <strong>Tumor detected:</strong>{" "}
+                  {prediction.tumor_detected ? "Yes" : "No"}
+                </p>
+
+                <p>
+                  <strong>Risk score:</strong>{" "}
+                  {(prediction.risk_score * 100).toFixed(1)}%
+                </p>
+
+                <div className="mt-2">
+                  <strong>Tumor size (pixels):</strong>
+                  <ul className="ml-4 list-disc text-xs">
+                    <li>Core: {prediction.tumor_size_pixels.core}</li>
+                    <li>Enhancing: {prediction.tumor_size_pixels.enhancing}</li>
+                    <li>Whole: {prediction.tumor_size_pixels.whole}</li>
+                  </ul>
+                </div>
+
+                {prediction.tumor_location && (
+                  <p className="mt-2">
+                    <strong>Location:</strong>{" "}
+                    (x={prediction.tumor_location.x.toFixed(1)},
+                    y={prediction.tumor_location.y.toFixed(1)})
+                  </p>
+                )}
+              </div>
+            )}
+            
+          </div>
           <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-4 flex flex-col gap-4">
             <div className="flex justify-between items-center text-xs text-slate-500">
               <span>Cognitive Activity</span>
