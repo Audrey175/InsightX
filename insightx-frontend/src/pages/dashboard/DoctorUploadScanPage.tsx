@@ -14,9 +14,22 @@ import type { PatientHeartRecord } from "../../data/patientHeartData";
 import { findPatientById, type StressLevel } from "../../data/fakeDatabase";
 import { useAuth } from "../../context/AuthContext";
 import { Button } from "../../components/ui/button";
+import {
+  predictMRI,
+  predictXRay,
+  type PredictionResult,
+  type XRayPredictionResult,
+} from "../../services/predictionService";
 
 const MAX_SIZE = 10 * 1024 * 1024;
-const allowedTypes = ["image/png", "image/jpeg", "image/jpg", "application/dicom", "application/dicom+json"];
+const allowedTypes = [
+  "image/png",
+  "image/jpeg",
+  "image/jpg",
+  "application/dicom",
+  "application/dicom+json",
+  "application/x-hdf5",
+];
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -31,6 +44,11 @@ export default function DoctorUploadScanPage() {
   const [error, setError] = useState<string | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [session, setSession] = useState<ScanSession | null>(null);
+  const [aiResult, setAiResult] = useState<
+    PredictionResult | XRayPredictionResult | null
+  >(null);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiError, setAiError] = useState<string | null>(null);
   const isDoctor = user?.role === "doctor";
 
   const patientInfo = findPatientById(patientId ?? "") || undefined;
@@ -45,10 +63,19 @@ export default function DoctorUploadScanPage() {
     setPreviewUrl(null);
   }, [file]);
 
+  useEffect(() => {
+    setAiResult(null);
+    setAiError(null);
+  }, [file, scanType]);
+
   const validateFile = (f: File | null) => {
     if (!f) return "File is required";
     if (f.size > MAX_SIZE) return "File size must be under 10MB";
-    if (!allowedTypes.includes(f.type) && !f.type.startsWith("image/"))
+    if (
+      !allowedTypes.includes(f.type) &&
+      !f.type.startsWith("image/") &&
+      !f.name.toLowerCase().endsWith(".h5")
+    )
       return "Unsupported file type";
     return null;
   };
@@ -201,6 +228,45 @@ export default function DoctorUploadScanPage() {
     navigate(`${target}?sessionId=${current.id}`, { replace: true });
   };
 
+  const isMriResult = (
+    result: PredictionResult | XRayPredictionResult
+  ): result is PredictionResult => "tumor_detected" in result;
+
+  const runAiPrediction = async () => {
+    setAiError(null);
+    setAiResult(null);
+
+    if (!file) {
+      setAiError("Select a file to run AI prediction.");
+      return;
+    }
+
+    if (scanType === "brain" && !file.name.toLowerCase().endsWith(".h5")) {
+      setAiError("MRI predictor expects a .h5 file.");
+      return;
+    }
+
+    if (scanType === "heart" && !file.type.startsWith("image/")) {
+      setAiError("X-ray predictor expects an image file.");
+      return;
+    }
+
+    setAiLoading(true);
+    try {
+      if (scanType === "brain") {
+        const result = await predictMRI(file);
+        setAiResult(result);
+      } else {
+        const result = await predictXRay(file);
+        setAiResult(result);
+      }
+    } catch {
+      setAiError("AI prediction failed. Please try again.");
+    } finally {
+      setAiLoading(false);
+    }
+  };
+
   const disableRun = !file || !isDoctor;
   const progress = session?.progress ?? 0;
 
@@ -251,7 +317,7 @@ export default function DoctorUploadScanPage() {
             <label className="text-sm font-medium">Upload file</label>
             <input
               type="file"
-              accept=".dcm,image/*"
+              accept=".dcm,.h5,image/*"
               onChange={(e) => setFile(e.target.files?.[0] ?? null)}
               className="text-sm"
             />
@@ -268,8 +334,72 @@ export default function DoctorUploadScanPage() {
               />
             )}
             <p className="text-[11px] text-slate-500">
-              Allowed: .dcm, .png, .jpg, .jpeg. Max 10MB.
+              Allowed: .dcm, .h5, .png, .jpg, .jpeg. Max 10MB.
             </p>
+          </div>
+
+          <div className="bg-slate-50 border rounded-2xl p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-medium">AI Prediction (optional)</p>
+              <span className="text-xs text-slate-500">
+                {scanType === "brain" ? "MRI (.h5)" : "X-ray (image)"}
+              </span>
+            </div>
+            <Button
+              onClick={runAiPrediction}
+              disabled={!file || aiLoading}
+              className="bg-slate-900 text-white hover:bg-slate-800 disabled:bg-slate-200 disabled:text-slate-500"
+            >
+              {aiLoading ? "Running..." : "Run AI Prediction"}
+            </Button>
+
+            {aiError && <p className="text-sm text-red-600">{aiError}</p>}
+
+            {aiResult && (
+              <div className="bg-white border rounded-xl p-3 text-xs space-y-2">
+                {isMriResult(aiResult) ? (
+                  <>
+                    <p className="font-semibold text-slate-800">
+                      MRI Prediction
+                    </p>
+                    <p>
+                      <span className="font-medium">File:</span>{" "}
+                      {aiResult.filename}
+                    </p>
+                    <p>
+                      <span className="font-medium">Tumor detected:</span>{" "}
+                      {aiResult.tumor_detected ? "Yes" : "No"}
+                    </p>
+                    <p>
+                      <span className="font-medium">Risk score:</span>{" "}
+                      {(aiResult.risk_score * 100).toFixed(1)}%
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <p className="font-semibold text-slate-800">
+                      X-ray Prediction
+                    </p>
+                    <p>
+                      <span className="font-medium">File:</span>{" "}
+                      {aiResult.filename}
+                    </p>
+                    <p>
+                      <span className="font-medium">Label:</span>{" "}
+                      {aiResult.prediction.label}
+                    </p>
+                    <p>
+                      <span className="font-medium">Confidence:</span>{" "}
+                      {(aiResult.prediction.confidence * 100).toFixed(1)}%
+                    </p>
+                    <p>
+                      <span className="font-medium">Risk:</span>{" "}
+                      {aiResult.prediction.risk_level}
+                    </p>
+                  </>
+                )}
+              </div>
+            )}
           </div>
 
           <div className="flex flex-col gap-2">
