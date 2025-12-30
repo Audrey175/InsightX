@@ -1,19 +1,33 @@
+<<<<<<< HEAD
 import React, { useState} from "react";
 import { predictMRI } from "../../api/predict";
 import type { PredictionResult } from "../../api/predict";
 import { useParams, useNavigate } from "react-router-dom";
+=======
+import React, { useEffect, useState } from "react";
+import { useNavigate, useParams, useSearchParams, Link } from "react-router-dom";
+import { jsPDF } from "jspdf";
+>>>>>>> main
 import DashboardLayout from "../../layouts/DashboardLayout";
 import BrainHero from "../../assets/brainhome.png";
-import {
-  findPatientById,
-  getDoctorBrainFor,
-  patients,
-} from "../../data/fakeDatabase";
 import PatientSelector from "../../components/PatientSelector";
+import { fetchDoctorBrainScan } from "../../services/doctorService";
+import type { DoctorBrainScanRecord } from "../../data/doctorBrainData";
+import { LoadingState } from "../../components/ui/LoadingState";
+import { ErrorState } from "../../components/ui/ErrorState";
+import { getLatestDoneSession, getSession } from "../../services/localScanStore";
+import { findPatientById } from "../../data/fakeDatabase";
+import { Button } from "../../components/ui/button";
+import {
+  predictMRI,
+  type PredictionResult,
+} from "../../services/predictionService";
 
 const DoctorBrainDashboard: React.FC = () => {
   const { patientId } = useParams<{ patientId: string }>();
+  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+<<<<<<< HEAD
   const patient = findPatientById(patientId) ?? patients[0];
   const data = getDoctorBrainFor(patient.id)!;
   
@@ -39,26 +53,187 @@ const DoctorBrainDashboard: React.FC = () => {
       setLoading(false);
     }
   };
+=======
+
+  const [scan, setScan] = useState<DoctorBrainScanRecord | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [mriPrediction, setMriPrediction] = useState<PredictionResult | null>(
+    null
+  );
+  const [mriLoading, setMriLoading] = useState(false);
+  const [mriError, setMriError] = useState<string | null>(null);
+
+  const sessionId = searchParams.get("sessionId");
+  const patientInfo = findPatientById(patientId ?? "");
+
+  const mapSession = () => {
+    if (!patientId) return null;
+    const session = sessionId
+      ? getSession(sessionId)
+      : getLatestDoneSession(patientId, "brain");
+    if (
+      !session ||
+      session.status !== "done" ||
+      session.type !== "brain" ||
+      session.patientId !== patientId ||
+      !session.data?.doctor
+    ) {
+      return null;
+    }
+    const sData = session.data.doctor as Partial<DoctorBrainScanRecord>;
+    return {
+      patientId,
+      patientName: sData.patientName ?? patientInfo?.name ?? "Unknown patient",
+      avatar: sData.avatar ?? patientInfo?.avatar ?? "NA",
+      lastScanDate: sData.lastScanDate ?? session.createdAt,
+      scanId: sData.scanId ?? `B-SESSION-${session.id}`,
+      oxygenation: sData.oxygenation ?? 0,
+      stress: sData.stress ?? "Normal",
+      focus: sData.focus ?? "Stable",
+      performanceScore: sData.performanceScore ?? 0,
+      injury: sData.injury ?? {
+        location: "N/A",
+        type: "N/A",
+        size: "N/A",
+        edema: "N/A",
+        imaging: [],
+      },
+      risks: sData.risks ?? [],
+      relatedCases: sData.relatedCases ?? [],
+    } as DoctorBrainScanRecord;
+  };
+
+  useEffect(() => {
+    const load = async () => {
+      if (!patientId) {
+        setError("Patient not found.");
+        setLoading(false);
+        return;
+      }
+
+      setLoading(true);
+      setError(null);
+      try {
+        const fromSession = mapSession();
+        if (fromSession) {
+          setScan(fromSession);
+          return;
+        }
+        const record = await fetchDoctorBrainScan(patientId);
+        if (!record) {
+          setError("No brain scan available for this patient.");
+        }
+        setScan(record);
+      } catch (err: any) {
+        setError(err?.message ?? "Unable to load scan.");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    load();
+  }, [patientId, sessionId]);
+
+  const handleNavigate = (target: "brain" | "heart") => {
+    const targetId = patientId ?? scan?.patientId ?? "";
+    if (targetId) {
+      navigate(`/dashboard/doctor/${target}/${targetId}`);
+    }
+  };
+
+  const exportPdf = () => {
+    if (!scan) return;
+    const doc = new jsPDF();
+    doc.text("InsightX Diagnostic Report", 10, 20);
+    doc.text(`Patient: ${scan.patientName} (${scan.patientId})`, 10, 30);
+    doc.text("Scan type: Brain", 10, 38);
+    doc.text(`Date: ${scan.lastScanDate ?? new Date().toISOString()}`, 10, 46);
+    doc.text("Key metrics:", 10, 58);
+    doc.text(`- Oxygenation: ${scan.oxygenation}%`, 14, 66);
+    doc.text(`- Stress: ${scan.stress}`, 14, 74);
+    doc.text(`- Focus: ${scan.focus}`, 14, 82);
+    doc.text(`- Performance: ${scan.performanceScore}`, 14, 90);
+    doc.text(`Injury: ${scan.injury.location} / ${scan.injury.type}`, 10, 104);
+    doc.text(`Notes: ${scan.risks?.[0] ?? "N/A"}`, 10, 114);
+    doc.text("Generated by InsightX (mock)", 10, 130);
+    doc.save(`InsightX_Brain_Report_${scan.patientId}.pdf`);
+  };
+
+  const handleMriUpload = async (
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setMriPrediction(null);
+    setMriError(null);
+
+    if (!file.name.toLowerCase().endsWith(".h5")) {
+      setMriError("MRI predictor expects a .h5 file.");
+      return;
+    }
+
+    setMriLoading(true);
+    try {
+      const result = await predictMRI(file);
+      setMriPrediction(result);
+    } catch {
+      setMriError("Failed to analyze MRI. Please try again.");
+    } finally {
+      setMriLoading(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <DashboardLayout>
+        <LoadingState message="Loading brain scan..." />
+      </DashboardLayout>
+    );
+  }
+
+  if (error || !scan) {
+    return (
+      <DashboardLayout>
+        <ErrorState
+          message={error ?? "No scan data."}
+          actionLabel="Go to patient list"
+          onAction={() => navigate("/dashboard/doctor/patients")}
+        />
+      </DashboardLayout>
+    );
+  }
+>>>>>>> main
 
   return (
     <DashboardLayout>
-      <div className="space-y-4">
+      <div className="space-y-4 min-w-0">
         {/* HEADER */}
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div>
             <p className="text-xs text-slate-500">
-              Home &gt; Personal Dashboard &gt; {data.scanId}
+              Home &gt; Personal Dashboard &gt; {scan.scanId}
             </p>
-            <h1 className="text-lg font-semibold mt-1">{patient.name}</h1>
+            <h1 className="text-lg font-semibold mt-1">{scan.patientName}</h1>
           </div>
 
-          <div className="flex items-center gap-3 text-xs">
-            {/* Organ switch */}
+          <div className="flex items-center gap-2 flex-wrap text-xs">
+            <Link
+              to={`/dashboard/doctor/history/${scan.patientId}`}
+              className="px-3 py-1 rounded-full border text-slate-700"
+            >
+              View Scan History
+            </Link>
+            <Button
+              onClick={exportPdf}
+              className="px-3 py-1 rounded-full bg-slate-900 text-white text-xs"
+            >
+              Export PDF Report
+            </Button>
             <div className="flex items-center gap-2">
               <button
-                onClick={() =>
-                  navigate(`/dashboard/doctor/heart/${patient.id}`)
-                }
+                onClick={() => handleNavigate("heart")}
                 className="px-3 py-1 rounded-full border text-slate-600"
               >
                 Heart
@@ -68,17 +243,17 @@ const DoctorBrainDashboard: React.FC = () => {
               </button>
             </div>
 
-            {/* Patient selector */}
-            <PatientSelector currentId={patient.id} organ="brain" />
+            <PatientSelector currentId={scan.patientId} organ="brain" />
 
             <div className="h-8 w-8 rounded-full bg-amber-300 flex items-center justify-center text-xs font-bold">
-              {patient.avatar}
+              {scan.avatar}
             </div>
           </div>
         </div>
 
-        <div className="grid grid-cols-[minmax(0,1.6fr)_minmax(0,1.4fr)] gap-4">
+        <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1.6fr)_minmax(0,1.4fr)] gap-4">
           {/* LEFT PANEL */}
+<<<<<<< HEAD
           <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 mt-2">
             <h2 className="text-xs font-semibold text-slate-700 mb-2">AI MRI Diagnosis</h2>
             <input
@@ -146,44 +321,117 @@ const DoctorBrainDashboard: React.FC = () => {
                   alt="Brain visualization"
                   className="max-h-56 object-contain"
                 />
+=======
+          <div className="space-y-4">
+            <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-4 flex flex-col gap-4">
+              <div className="flex justify-between items-center text-xs text-slate-500">
+                <span>Cognitive Activity</span>
+                <span>3D | Heat map | Raw</span>
+>>>>>>> main
               </div>
 
-              <div className="w-60 space-y-3 text-xs">
-                <div className="bg-slate-50 rounded-xl p-3">
-                  <p className="font-semibold text-slate-700 mb-1">
-                    Cognitive Activity
-                  </p>
-                  <div className="grid grid-cols-2 gap-1 text-[11px] text-slate-600">
-                    <span>Brain Oxygenation (SO₂)</span>
-                    <span className="text-right">{data.oxygenation}%</span>
-                    <span>Stress Level</span>
-                    <span className="text-right">{data.stress}</span>
-                    <span>Focus Index</span>
-                    <span className="text-right">{data.focus}</span>
-                  </div>
+              <div className="flex flex-col lg:flex-row gap-4">
+                <div className="flex-1 flex items-center justify-center">
+                  <img
+                    src={BrainHero}
+                    alt="Brain visualization"
+                    className="max-h-56 object-contain"
+                  />
                 </div>
 
-                <div className="bg-slate-50 rounded-xl p-3">
-                  <p className="font-semibold text-slate-700 mb-1">
-                    Cognitive Performance
-                  </p>
-                  <p className="text-[11px] text-slate-600">
-                    {data.performanceScore} / 100 · Normal
-                  </p>
+                <div className="w-full lg:w-60 space-y-3 text-xs">
+                  <div className="bg-slate-50 rounded-xl p-3">
+                    <p className="font-semibold text-slate-700 mb-1">
+                      Cognitive Activity
+                    </p>
+                    <div className="grid grid-cols-2 gap-1 text-[11px] text-slate-600">
+                      <span>Brain Oxygenation (SO2)</span>
+                      <span className="text-right">{scan.oxygenation}%</span>
+                      <span>Stress Level</span>
+                      <span className="text-right">{scan.stress}</span>
+                      <span>Focus Index</span>
+                      <span className="text-right">{scan.focus}</span>
+                    </div>
+                  </div>
+
+                  <div className="bg-slate-50 rounded-xl p-3">
+                    <p className="font-semibold text-slate-700 mb-1">
+                      Cognitive Performance
+                    </p>
+                    <p className="text-[11px] text-slate-600">
+                      {scan.performanceScore} / 100
+                    </p>
+                  </div>
                 </div>
+              </div>
+
+              <div className="flex gap-3 text-xs">
+                <button className="px-4 py-1.5 rounded-full bg-sky-700 text-white font-medium">
+                  3D
+                </button>
+                <button className="px-4 py-1.5 rounded-full bg-slate-100 text-slate-700">
+                  Heat map
+                </button>
+                <button className="px-4 py-1.5 rounded-full bg-slate-100 text-slate-700">
+                  Raw
+                </button>
               </div>
             </div>
 
-            <div className="flex gap-3 text-xs">
-              <button className="px-4 py-1.5 rounded-full bg-sky-700 text-white font-medium">
-                3D
-              </button>
-              <button className="px-4 py-1.5 rounded-full bg-slate-100 text-slate-700">
-                Heat map
-              </button>
-              <button className="px-4 py-1.5 rounded-full bg-slate-100 text-slate-700">
-                Raw
-              </button>
+            <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-4 space-y-3">
+              <div className="flex items-center justify-between text-xs text-slate-500">
+                <span>AI MRI Diagnosis</span>
+                <span>.h5 upload</span>
+              </div>
+              <input
+                type="file"
+                accept=".h5"
+                onChange={handleMriUpload}
+                className="text-xs"
+              />
+
+              {mriLoading && (
+                <p className="text-xs text-slate-500">Analyzing MRI...</p>
+              )}
+
+              {mriError && <p className="text-xs text-red-600">{mriError}</p>}
+
+              {mriPrediction && (
+                <div className="bg-slate-50 rounded-xl p-3 text-xs space-y-1">
+                  <p className="font-semibold text-slate-800">
+                    AI Diagnosis Result
+                  </p>
+                  <p>
+                    <span className="font-medium">File:</span>{" "}
+                    {mriPrediction.filename}
+                  </p>
+                  <p>
+                    <span className="font-medium">Tumor detected:</span>{" "}
+                    {mriPrediction.tumor_detected ? "Yes" : "No"}
+                  </p>
+                  <p>
+                    <span className="font-medium">Risk score:</span>{" "}
+                    {(mriPrediction.risk_score * 100).toFixed(1)}%
+                  </p>
+                  <div>
+                    <p className="font-medium">Tumor size (pixels)</p>
+                    <ul className="ml-4 list-disc text-[11px]">
+                      <li>Core: {mriPrediction.tumor_size_pixels.core}</li>
+                      <li>
+                        Enhancing: {mriPrediction.tumor_size_pixels.enhancing}
+                      </li>
+                      <li>Whole: {mriPrediction.tumor_size_pixels.whole}</li>
+                    </ul>
+                  </div>
+                  {mriPrediction.tumor_location && (
+                    <p>
+                      <span className="font-medium">Location:</span> x=
+                      {mriPrediction.tumor_location.x.toFixed(1)}, y=
+                      {mriPrediction.tumor_location.y.toFixed(1)}
+                    </p>
+                  )}
+                </div>
+              )}
             </div>
           </div>
 
@@ -194,11 +442,11 @@ const DoctorBrainDashboard: React.FC = () => {
                 Injury details
               </h2>
               <div className="space-y-1 text-[11px] text-slate-700">
-                <p>Injury Location: {data.injury.location}</p>
-                <p>Injury Type: {data.injury.type}</p>
-                <p>Injury Size: {data.injury.size}</p>
-                <p>Edema Volume: {data.injury.edema}</p>
-                <p>Imaging Used: {data.injury.imaging.join(", ")}</p>
+                <p>Injury Location: {scan.injury.location}</p>
+                <p>Injury Type: {scan.injury.type}</p>
+                <p>Injury Size: {scan.injury.size}</p>
+                <p>Edema Volume: {scan.injury.edema}</p>
+                <p>Imaging Used: {scan.injury.imaging.join(", ")}</p>
               </div>
             </div>
 
@@ -207,8 +455,8 @@ const DoctorBrainDashboard: React.FC = () => {
                 Potential risk
               </h2>
               <ul className="list-disc list-inside text-[11px] text-slate-700 space-y-1">
-                {data.risks.map((r, idx) => (
-                  <li key={idx}>{r}</li>
+                {scan.risks.map((risk) => (
+                  <li key={risk}>{risk}</li>
                 ))}
               </ul>
             </div>
@@ -218,8 +466,8 @@ const DoctorBrainDashboard: React.FC = () => {
                 Related cases
               </h2>
               <ul className="list-disc list-inside text-[11px] text-slate-700 space-y-1">
-                {data.relatedCases.map((c, idx) => (
-                  <li key={idx}>{c}</li>
+                {scan.relatedCases.map((relatedCase) => (
+                  <li key={relatedCase}>{relatedCase}</li>
                 ))}
               </ul>
             </div>

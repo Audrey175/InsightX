@@ -60,13 +60,17 @@ export type PatientRecord = {
   id: string;          // P-0001
   name: string;        // Glenn Quagmire
   avatar: string;      // initials like GQ
+  age?: number;
+  lastBrainScan?: string;
+  lastHeartScan?: string;
+  doctorId?: string;
   doctor: {
-    brain: DoctorBrainScan;
-    heart: DoctorHeartScan;
+    brain?: DoctorBrainScan;
+    heart?: DoctorHeartScan;
   };
   patient: {
-    brain: PatientBrainView;
-    heart: PatientHeartView;
+    brain?: PatientBrainView;
+    heart?: PatientHeartView;
   };
 };
 
@@ -78,6 +82,10 @@ export const patients: PatientRecord[] = [
     id: "P-0001",
     name: "Mr. Glenn Quagmire",
     avatar: "GQ",
+    age: 45,
+    lastBrainScan: "2025-01-12",
+    lastHeartScan: "2025-01-10",
+    doctorId: "d-1",
     doctor: {
       brain: {
         scanId: "B-0001",
@@ -88,7 +96,7 @@ export const patients: PatientRecord[] = [
         injury: {
           location: "Left Temporal Lobe",
           type: "Hemorrhagic Contusion",
-          size: "2.4 cm × 1.1 cm",
+          size: "2.4 cm x 1.1 cm",
           edema: "~12 ml",
           imaging: ["MRI T1", "T2", "FLAIR", "DWI"],
         },
@@ -99,8 +107,8 @@ export const patients: PatientRecord[] = [
           "Possible post-traumatic epilepsy (long term)",
         ],
         relatedCases: [
-          "Motorbike chest impact · Mild RV contusion",
-          "Sports collision · Head impact",
+          "Motorbike chest impact - Mild RV contusion",
+          "Sports collision - Head impact",
           "Post-traumatic seizure episodes",
         ],
       },
@@ -122,7 +130,7 @@ export const patients: PatientRecord[] = [
           "Low risk of arrhythmia",
         ],
         relatedCases: [
-          "Sports collision · Chest impact",
+          "Sports collision - Chest impact",
           "Minor car crash trauma",
         ],
       },
@@ -161,6 +169,10 @@ export const patients: PatientRecord[] = [
     id: "P-0002",
     name: "Ms. Lois Griffin",
     avatar: "LG",
+    age: 42,
+    lastBrainScan: "2025-01-05",
+    lastHeartScan: "2025-01-05",
+    doctorId: "d-1",
     doctor: {
       brain: {
         scanId: "B-0002",
@@ -176,12 +188,12 @@ export const patients: PatientRecord[] = [
           imaging: ["CT Head", "MRI T2"],
         },
         risks: [
-          "Headache and attention span reduction for 1–2 weeks",
+          "Headache and attention span reduction for 1-2 weeks",
           "Low risk of long-term complications",
         ],
         relatedCases: [
-          "Minor domestic fall · No LOC",
-          "Sports injury · Soccer header",
+          "Minor domestic fall - No loss of consciousness",
+          "Sports injury - Soccer header",
         ],
       },
       heart: {
@@ -198,7 +210,7 @@ export const patients: PatientRecord[] = [
           imaging: ["Echo", "ECG"],
         },
         risks: ["Low global cardiovascular risk"],
-        relatedCases: ["Routine checkup · No abnormalities"],
+        relatedCases: ["Routine checkup - No abnormalities"],
       },
     },
     patient: {
@@ -210,7 +222,7 @@ export const patients: PatientRecord[] = [
         score: 92,
         doctorSummary: "Your brain scan looks healthy.",
         doctorNotes: [
-          "Mild concussion–like symptoms may occur (headache, fatigue).",
+          "Mild concussion-like symptoms may occur (headache, fatigue).",
           "Rest and proper sleep are recommended.",
         ],
       },
@@ -233,6 +245,10 @@ export const patients: PatientRecord[] = [
     id: "P-0003",
     name: "Mr. Peter Griffin",
     avatar: "PG",
+    age: 48,
+    lastBrainScan: "2024-12-22",
+    lastHeartScan: "2024-12-18",
+    doctorId: "d-2",
     doctor: {
       brain: {
         scanId: "B-0003",
@@ -243,7 +259,7 @@ export const patients: PatientRecord[] = [
         injury: {
           location: "Right Parietal Lobe",
           type: "Ischemic Stroke (subacute)",
-          size: "3.1 cm × 2.2 cm",
+          size: "3.1 cm x 2.2 cm",
           edema: "~18 ml",
           imaging: ["MRI DWI", "FLAIR", "Perfusion"],
         },
@@ -310,6 +326,187 @@ export const patients: PatientRecord[] = [
       },
     },
   },
+
+  {
+    id: "P-0004",
+    name: "Ms. Diane Simmons",
+    avatar: "DS",
+    age: 38,
+    lastHeartScan: "2025-01-08",
+    doctorId: "d-1",
+    doctor: {
+      heart: {
+        scanId: "H-0004",
+        heartRate: 88,
+        oxygen: 97,
+        pressure: "125/80 mmHg",
+        condition: "Post-viral myocarditis (resolving)",
+        injury: {
+          region: "Myocardium",
+          type: "Mild inflammation",
+          severity: "Moderate",
+          size: "1.1 cm focal region",
+          imaging: ["Cardiac MRI", "ECG"],
+        },
+        risks: ["Shortness of breath on exertion"],
+        relatedCases: ["Recent viral infection with cardiac impact"],
+      },
+    },
+    patient: {
+      heart: {
+        scanId: "H-0004",
+        bpm: 88,
+        oxygen: 97,
+        stress: "Normal",
+        pressure: "125/80 mmHg",
+        condition: "Recovering myocarditis; monitor symptoms.",
+        doctorNotes: [
+          "Avoid strenuous exercise until cleared.",
+          "Report chest pain or palpitations immediately.",
+        ],
+      },
+    },
+  },
+
+  {
+    id: "P-0005",
+    name: "Mr. Cleveland Brown",
+    avatar: "CB",
+    age: 50,
+    lastBrainScan: "2025-01-02",
+    doctorId: "d-2",
+    doctor: {
+      brain: {
+        scanId: "B-0005",
+        oxygenation: 75,
+        stress: "Low",
+        focus: "Stable",
+        performanceScore: 88,
+        injury: {
+          location: "Occipital Lobe",
+          type: "Minor contusion",
+          size: "1.0 cm region",
+          edema: "~6 ml",
+          imaging: ["MRI T1", "T2"],
+        },
+        risks: ["Temporary visual disturbances"],
+        relatedCases: ["Slip and fall - back of head impact"],
+      },
+    },
+    patient: {
+      brain: {
+        scanId: "B-0005",
+        oxygenation: 75,
+        stress: "Low",
+        focus: "Stable",
+        score: 88,
+        doctorSummary: "Minor injury with low risk of complications.",
+        doctorNotes: [
+          "Monitor for headaches or visual changes.",
+          "Follow-up scan suggested in 2 months.",
+        ],
+      },
+    },
+  },
+
+  {
+    id: "P-0006",
+    name: "Ms. Brenda Quagmire",
+    avatar: "BQ",
+    age: 47,
+    lastBrainScan: "2025-01-04",
+    doctorId: "d-3",
+    doctor: {
+      brain: {
+        scanId: "B-0006",
+        oxygenation: 80,
+        stress: "Normal",
+        focus: "Stable",
+        performanceScore: 90,
+        injury: {
+          location: "Parietal Lobe",
+          type: "Minor contusion",
+          size: "1.2 cm region",
+          edema: "~5 ml",
+          imaging: ["CT", "MRI T2"],
+        },
+        risks: ["Mild dizziness possible"],
+        relatedCases: ["Household fall"],
+      },
+    },
+    patient: {
+      brain: {
+        scanId: "B-0006",
+        oxygenation: 80,
+        stress: "Normal",
+        focus: "Stable",
+        score: 90,
+        doctorSummary: "Minor issue, no major concerns.",
+        doctorNotes: ["Monitor for dizziness.", "Return if symptoms worsen."],
+      },
+    },
+  },
+
+  {
+    id: "P-0007",
+    name: "Mr. Joe Swanson",
+    avatar: "JS",
+    age: 46,
+    lastHeartScan: "2025-01-09",
+    doctorId: "d-2",
+    doctor: {
+      heart: {
+        scanId: "H-0007",
+        heartRate: 88,
+        oxygen: 97,
+        pressure: "135/88 mmHg",
+        condition: "Post-operative monitoring",
+        injury: {
+          region: "Right Ventricle",
+          type: "Surgical repair",
+          severity: "Moderate",
+          size: "2.0 cm region",
+          imaging: ["Cardiac MRI", "Echo"],
+        },
+        risks: ["Monitor for arrhythmia", "Post-op inflammation"],
+        relatedCases: ["Recent surgery follow-up"],
+      },
+    },
+    patient: {
+      heart: {
+        scanId: "H-0007",
+        bpm: 88,
+        oxygen: 97,
+        stress: "High",
+        pressure: "135/88 mmHg",
+        condition: "Recovering post-surgery.",
+        doctorNotes: [
+          "Avoid strenuous activity.",
+          "Report palpitations immediately.",
+        ],
+      },
+    },
+  },
+
+  {
+    id: "P-0008",
+    name: "Ms. Angela Jones",
+    avatar: "AJ",
+    age: 36,
+    doctorId: "d-4",
+    doctor: {},
+    patient: {},
+  },
+
+  {
+    id: "P-0009",
+    name: "Mr. Carl Johnson",
+    avatar: "CJ",
+    age: 40,
+    doctorId: "d-4",
+    doctor: {},
+    patient: {},
+  },
 ];
 
 // ==== HELPERS ====
@@ -318,13 +515,13 @@ export const findPatientById = (patientId: string | undefined) =>
   patients.find((p) => p.id === patientId);
 
 export const getDoctorBrainFor = (patientId: string | undefined) =>
-  findPatientById(patientId)?.doctor.brain;
+  findPatientById(patientId)?.doctor?.brain;
 
 export const getDoctorHeartFor = (patientId: string | undefined) =>
-  findPatientById(patientId)?.doctor.heart;
+  findPatientById(patientId)?.doctor?.heart;
 
 export const getPatientBrainFor = (patientId: string | undefined) =>
-  findPatientById(patientId)?.patient.brain;
+  findPatientById(patientId)?.patient?.brain;
 
 export const getPatientHeartFor = (patientId: string | undefined) =>
-  findPatientById(patientId)?.patient.heart;
+  findPatientById(patientId)?.patient?.heart;
