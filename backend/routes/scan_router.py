@@ -1,8 +1,8 @@
 from fastapi import APIRouter, UploadFile, File, Depends
 from sqlalchemy.orm import Session
-from database import SessionLocal
-from models.scan import Scan
-from services.reconstruction_service import reconstruct_3d, analyze_injury
+# from database import SessionLocal
+from backend.models.scan import Scan
+# from services.reconstruction_service import reconstruct_3d, analyze_injury
 
 import shutil
 import uuid
