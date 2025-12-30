@@ -1,3 +1,42 @@
+<<<<<<< HEAD
+import torch
+from PIL import Image
+from torchvision import transforms
+import os
+
+from backend.models.cnn_model import XRayCNN
+
+# -----------------------
+# Load model ONCE
+# -----------------------
+device = "cuda" if torch.cuda.is_available() else "cpu"
+
+model = XRayCNN()
+model.load_state_dict(
+    torch.load("backend/models/xray_model.pth", map_location=device)
+)
+model.to(device)
+model.eval()
+
+# -----------------------
+# Image preprocessing
+# -----------------------
+transform = transforms.Compose([
+    transforms.Resize((224, 224)),
+    transforms.Grayscale(num_output_channels=3),  # IMPORTANT
+    transforms.ToTensor()
+])
+
+# -----------------------
+# Prediction function
+# -----------------------
+def analyze_xray(image_path: str):
+    image = Image.open(image_path).convert("L")
+    image = transform(image).unsqueeze(0).to(device)
+
+    with torch.no_grad():
+        logits = model(image)
+=======
 from __future__ import annotations
 
 from pathlib import Path
@@ -56,11 +95,16 @@ def analyze_xray(image_path: str) -> dict:
 
     with torch.no_grad():
         logits = model(tensor)
+>>>>>>> main
         prob_pneumonia = torch.sigmoid(logits).item()
 
     label = "PNEUMONIA" if prob_pneumonia >= 0.5 else "NORMAL"
     confidence = prob_pneumonia if label == "PNEUMONIA" else 1 - prob_pneumonia
 
+<<<<<<< HEAD
+    # Risk logic
+=======
+>>>>>>> main
     if label == "PNEUMONIA":
         if confidence >= 0.9:
             risk = "high"
@@ -79,6 +123,18 @@ def analyze_xray(image_path: str) -> dict:
             "confidence": round(confidence, 3),
             "probabilities": {
                 "NORMAL": round(1 - prob_pneumonia, 3),
+<<<<<<< HEAD
+                "PNEUMONIA": round(prob_pneumonia, 3)
+            },
+            "risk_level": risk
+        },
+        "model_info": {
+            "architecture": "CNN (ResNet-based)",
+            "version": "xray-v1"
+        },
+        "disclaimer": "This AI system is for research and decision support only."
+    }
+=======
                 "PNEUMONIA": round(prob_pneumonia, 3),
             },
             "risk_level": risk,
@@ -89,3 +145,4 @@ def analyze_xray(image_path: str) -> dict:
         },
         "disclaimer": "This AI system is for research and decision support only.",
     }
+>>>>>>> main

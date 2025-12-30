@@ -1,8 +1,22 @@
+<<<<<<< HEAD
+import React, { useState} from "react";
+import { predictXRay } from "../../api/xray_predict";
+import type { XRayPredictionResult } from "../../api/xray_predict";
+import { useParams, useNavigate } from "react-router-dom";
+import DashboardLayout from "../../layouts/DashboardLayout";
+// import HeartHero from "../../assets/researchers.png";
+import {
+  findPatientById,
+  getDoctorHeartFor,
+  patients,
+} from "../../data/fakeDatabase";
+=======
 import React, { useEffect, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { jsPDF } from "jspdf";
 import DashboardLayout from "../../layouts/DashboardLayout";
 import HeartHero from "../../assets/researchers.png";
+>>>>>>> main
 import PatientSelector from "../../components/PatientSelector";
 import { fetchDoctorHeartScan } from "../../services/doctorService";
 import type { DoctorHeartScanRecord } from "../../data/doctorHeartData";
@@ -21,6 +35,32 @@ const DoctorHeartDashboard: React.FC = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
 
+<<<<<<< HEAD
+  const patient = findPatientById(patientId) ?? patients[0];
+  const data = getDoctorHeartFor(patient.id)!;
+  const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [prediction, setPrediction] = useState<XRayPredictionResult | null>(null);
+  const [loading, setLoading] = useState<boolean>(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleXrayUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const file = e.target.files?.[0];
+  if (!file) return;
+  setSelectedImage(URL.createObjectURL(file));
+  setLoading(true);
+  setError(null);
+
+  try {
+    const result = await predictXRay(file);
+    console.log("X-RAY RESULT:", result);
+    setPrediction(result);
+  } catch {
+    setError("Failed to analyze X-ray.");
+  } finally {
+    setLoading(false);
+  }
+};
+=======
   const [scan, setScan] = useState<DoctorHeartScanRecord | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -184,6 +224,7 @@ const DoctorHeartDashboard: React.FC = () => {
       </DashboardLayout>
     );
   }
+>>>>>>> main
 
   return (
     <DashboardLayout>
@@ -232,6 +273,89 @@ const DoctorHeartDashboard: React.FC = () => {
 
         <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1.6fr)_minmax(0,1.4fr)] gap-4">
           {/* LEFT */}
+<<<<<<< HEAD
+          <div className="bg-white rounded-2xl shadow-sm border p-4">
+            <div className="flex justify-between text-xs text-slate-500">
+              <h2 className="font-semibold mb-2">Upload Chest X-ray</h2>
+            </div>
+            <input
+              type="file"
+              accept="image/*"
+              onChange={handleXrayUpload}
+              className="text-xs"
+            />
+
+            {selectedImage && ( 
+              <img src={selectedImage} 
+              alt="Uploaded Xray" 
+              className="mt-2 h-32 object-contain rounded" 
+              /> 
+            )}
+
+             {loading && (
+              <p className="text-xs text-slate-500 mt-2">
+                Analyzing X-ray...
+              </p>
+            )}
+
+            {error && (
+              <p className="text-xs text-red-500 mt-2">
+                {error}
+              </p>
+            )}
+            
+          </div>
+
+          {/* RIGHT */}
+          {prediction && (
+            <div className="bg-white rounded-2xl shadow-sm border p-4 space-y-2 text-xs">
+              <h2 className="font-semibold text-sm">X-ray AI Analysis</h2>
+
+              <p>
+                <strong>File:</strong> {prediction.filename}
+              </p>
+
+              <p>
+                <strong>Modality:</strong> {prediction.modality.toUpperCase()}
+              </p>
+
+              <p>
+                <strong>Prediction:</strong>{" "}
+                <span
+                  className={
+                    prediction.prediction.label === "PNEUMONIA"
+                      ? "text-red-600 font-semibold"
+                      : "text-green-600 font-semibold"
+                  }
+                >
+                  {prediction.prediction.label}
+                </span>
+              </p>
+
+              <p>
+                <strong>Confidence:</strong>{" "}
+                {(prediction.prediction.confidence * 100).toFixed(1)}%
+              </p>
+
+              <p>
+                <strong>Risk Level:</strong>{" "}
+                <span className="capitalize">
+                  {prediction.prediction.risk_level}
+                </span>
+              </p>
+
+              <div className="mt-2">
+                <p className="font-semibold">Probabilities</p>
+                <ul className="ml-3 list-disc">
+                  <li>
+                    NORMAL: {(prediction.prediction.probabilities.NORMAL * 100).toFixed(1)}%
+                  </li>
+                  <li>
+                    PNEUMONIA:{" "}
+                    {(prediction.prediction.probabilities.PNEUMONIA * 100).toFixed(1)}%
+                  </li>
+                </ul>
+=======
           <div className="space-y-4">
             <div className="bg-white rounded-2xl shadow-sm border p-4 space-y-4">
               <div className="flex justify-between text-xs text-slate-500">
@@ -378,9 +502,20 @@ const DoctorHeartDashboard: React.FC = () => {
                 <p>Severity: {scan.injury.severity}</p>
                 <p>Size: {scan.injury.size}</p>
                 <p>Imaging Used: {scan.injury.imaging.join(", ")}</p>
+>>>>>>> main
               </div>
-            </div>
 
+<<<<<<< HEAD
+              <div className="mt-2">
+                <p className="font-semibold">Model Information</p>
+                <p>Architecture: {prediction.model_info.architecture}</p>
+                <p>Version: {prediction.model_info.version}</p>
+              </div>
+
+              <p className="text-[10px] text-slate-400 mt-3">
+                {prediction.disclaimer}
+              </p>
+=======
             <div className="bg-white rounded-2xl shadow-sm border p-4">
               <h2 className="font-semibold mb-2">Potential Risks</h2>
               <ul className="list-disc list-inside text-[11px] space-y-1">
@@ -397,8 +532,9 @@ const DoctorHeartDashboard: React.FC = () => {
                   <li key={relatedCase}>{relatedCase}</li>
                 ))}
               </ul>
+>>>>>>> main
             </div>
-          </div>
+          )}
         </div>
       </div>
     </DashboardLayout>

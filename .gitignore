@@ -1,41 +1,70 @@
-# Python
+# Environment Variables (CRITICAL: Do not commit secrets!)
+.env
+.env.local
+.env.production
+.flaskenv
+
+# Python byte-code files and cache
 __pycache__/
-*.py[cod]
+*.pyc
 *.pyo
 *.pyd
-*.egg-info/
-.env
-.venv/
+*.so
+.Python
+
+# Virtual Environment Directories
 venv/
-.pytest_cache/
-.mypy_cache/
+env/
+ENV/
+.venv/
 
-# Node
-node_modules/
-dist/
-dist-ssr/
+# Build artifacts and distribution
 build/
-*.local
+dist/
+develop-eggs/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+MANIFEST
 
-# Logs
-logs
-*.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
-lerna-debug.log*
+# Testing and coverage reports
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+nosetests.xml
+coverage.xml
+.cache/
 
-# Uploads/output
-uploads/
-
-# Editor directories and files
-.vscode/*
-!.vscode/extensions.json
+# IDE specific files
+# VS Code
+.vscode/settings.json
+.vscode/launch.json
+.vscode/tasks.json
+# JetBrains IDEs (PyCharm, WebStorm, etc.)
 .idea/
+
+# Database files (if using SQLite for local development)
+*.db
+*.sqlite
+*.sqlite3
+
+# Logs and runtime files
+*.log
+logs/
+*.pid
+instance/
+.webassets-cache
+
+# Operating System Files
 .DS_Store
-*.suo
-*.ntvs*
-*.njsproj
-*.sln
-*.sw?
+Thumbs.db
+Desktop.ini
