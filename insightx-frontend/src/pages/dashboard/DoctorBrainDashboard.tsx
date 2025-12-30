@@ -1,8 +1,9 @@
 import React, { useState} from "react";
 import { predictMRI } from "../../api/predict";
-import type { PredictionResult } from "../../api/predict";
+import type { MRIPredictionResult } from "../../api/predict";
 import { useParams, useNavigate } from "react-router-dom";
 import DashboardLayout from "../../layouts/DashboardLayout";
+import MRIViewer from "../../components/dashboard/MRI_Viewer";
 import BrainHero from "../../assets/brainhome.png";
 import {
   findPatientById,
@@ -17,7 +18,8 @@ const DoctorBrainDashboard: React.FC = () => {
   const patient = findPatientById(patientId) ?? patients[0];
   const data = getDoctorBrainFor(patient.id)!;
   
-  const [prediction, setPrediction] = useState<PredictionResult  | null>(null);
+  const [prediction, setPrediction] = useState<MRIPredictionResult | null>(null);
+
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -31,11 +33,12 @@ const DoctorBrainDashboard: React.FC = () => {
 
     try {
     const result = await predictMRI(file);
-    console.log("API RESULT:", result);   // ← DEBUG
+    console.log("API RESULT:", result);   
     setPrediction(result);
-    } catch {
-      setError("Failed to analyze MRI. Please try again.");
-    } finally {
+    } catch (err) {
+  console.error("MRI ERROR:", err);
+  setError("Failed to analyze MRI. Please try again.");
+} finally {
       setLoading(false);
     }
   };
@@ -83,7 +86,7 @@ const DoctorBrainDashboard: React.FC = () => {
             <h2 className="text-xs font-semibold text-slate-700 mb-2">AI MRI Diagnosis</h2>
             <input
               type="file"
-              accept="image/*"
+              accept=".zip"
               onChange={handleMRIUpload}
               className="text-xs"
             />
@@ -97,40 +100,47 @@ const DoctorBrainDashboard: React.FC = () => {
             )}
 
             {prediction && (
-              <div className="bg-slate-100 p-4 rounded-xl mt-4 text-sm space-y-1">
-                <h3 className="font-semibold text-slate-800 mb-2">
-                  AI Diagnosis Result
-                </h3>
+  <div className="bg-slate-100 p-4 rounded-xl mt-4 text-sm space-y-2">
+    <h3 className="font-semibold text-slate-800 mb-2">
+      MRI Reconstruction Summary
+    </h3>
 
-                <p>
-                  <p><strong>File analyzed:</strong> {prediction.filename}</p>
-                  <strong>Tumor detected:</strong>{" "}
-                  {prediction.tumor_detected ? "Yes" : "No"}
-                </p>
+    <p>
+      <strong>Series used:</strong> {prediction.series_used}
+    </p>
 
-                <p>
-                  <strong>Risk score:</strong>{" "}
-                  {(prediction.risk_score * 100).toFixed(1)}%
-                </p>
+    <p>
+      <strong>Series detected:</strong> {prediction.series_detected}
+    </p>
 
-                <div className="mt-2">
-                  <strong>Tumor size (pixels):</strong>
-                  <ul className="ml-4 list-disc text-xs">
-                    <li>Core: {prediction.tumor_size_pixels.core}</li>
-                    <li>Enhancing: {prediction.tumor_size_pixels.enhancing}</li>
-                    <li>Whole: {prediction.tumor_size_pixels.whole}</li>
-                  </ul>
-                </div>
+    <p>
+      <strong>Volume shape:</strong>{" "}
+      {prediction.volume_shape.depth} ×{" "}
+      {prediction.volume_shape.height} ×{" "}
+      {prediction.volume_shape.width}
+    </p>
 
-                {prediction.tumor_location && (
-                  <p className="mt-2">
-                    <strong>Location:</strong>{" "}
-                    (x={prediction.tumor_location.x.toFixed(1)},
-                    y={prediction.tumor_location.y.toFixed(1)})
-                  </p>
-                )}
-              </div>
-            )}
+    <p>
+      <strong>Voxel spacing (mm):</strong>{" "}
+      {prediction.voxel_spacing.join(", ")}
+    </p>
+
+    <p>
+      <strong>Mean intensity:</strong>{" "}
+      {prediction.statistics.mean_intensity}
+    </p>
+
+    <p>
+      <strong>Max intensity:</strong>{" "}
+      {prediction.statistics.max_intensity}
+    </p>
+
+    <p className="text-xs text-slate-500 mt-2">
+      {prediction.disclaimer}
+    </p>
+  </div>
+)}
+
             
           </div>
           <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-4 flex flex-col gap-4">
@@ -140,13 +150,15 @@ const DoctorBrainDashboard: React.FC = () => {
             </div>
 
             <div className="flex gap-4">
-              <div className="flex-1 flex items-center justify-center">
-                <img
-                  src={BrainHero}
-                  alt="Brain visualization"
-                  className="max-h-56 object-contain"
-                />
-              </div>
+             <div className="flex-1 flex items-center justify-center">
+  {prediction ? (
+  <MRIViewer modelUrl={`http://localhost:8000${prediction.reconstruction_image}`} />
+) : (
+  <img src={BrainHero} alt="Placeholder" className="max-h-56 object-contain opacity-40" />
+)}
+</div>
+
+
 
               <div className="w-60 space-y-3 text-xs">
                 <div className="bg-slate-50 rounded-xl p-3">
