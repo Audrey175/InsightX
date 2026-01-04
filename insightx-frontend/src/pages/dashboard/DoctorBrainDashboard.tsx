@@ -1,13 +1,10 @@
-<<<<<<< HEAD
 import React, { useState} from "react";
 import { predictMRI } from "../../api/predict";
 import type { PredictionResult } from "../../api/predict";
 import { useParams, useNavigate } from "react-router-dom";
-=======
 import React, { useEffect, useState } from "react";
 import { useNavigate, useParams, useSearchParams, Link } from "react-router-dom";
 import { jsPDF } from "jspdf";
->>>>>>> main
 import DashboardLayout from "../../layouts/DashboardLayout";
 import BrainHero from "../../assets/brainhome.png";
 import PatientSelector from "../../components/PatientSelector";
@@ -27,7 +24,6 @@ const DoctorBrainDashboard: React.FC = () => {
   const { patientId } = useParams<{ patientId: string }>();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-<<<<<<< HEAD
   const patient = findPatientById(patientId) ?? patients[0];
   const data = getDoctorBrainFor(patient.id)!;
   
@@ -53,7 +49,6 @@ const DoctorBrainDashboard: React.FC = () => {
       setLoading(false);
     }
   };
-=======
 
   const [scan, setScan] = useState<DoctorBrainScanRecord | null>(null);
   const [loading, setLoading] = useState(true);
@@ -204,7 +199,6 @@ const DoctorBrainDashboard: React.FC = () => {
       </DashboardLayout>
     );
   }
->>>>>>> main
 
   return (
     <DashboardLayout>
@@ -253,7 +247,6 @@ const DoctorBrainDashboard: React.FC = () => {
 
         <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1.6fr)_minmax(0,1.4fr)] gap-4">
           {/* LEFT PANEL */}
-<<<<<<< HEAD
           <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 mt-2">
             <h2 className="text-xs font-semibold text-slate-700 mb-2">AI MRI Diagnosis</h2>
             <input
@@ -321,13 +314,11 @@ const DoctorBrainDashboard: React.FC = () => {
                   alt="Brain visualization"
                   className="max-h-56 object-contain"
                 />
-=======
           <div className="space-y-4">
             <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-4 flex flex-col gap-4">
               <div className="flex justify-between items-center text-xs text-slate-500">
                 <span>Cognitive Activity</span>
                 <span>3D | Heat map | Raw</span>
->>>>>>> main
               </div>
 
               <div className="flex flex-col lg:flex-row gap-4">
@@ -478,4 +469,4 @@ const DoctorBrainDashboard: React.FC = () => {
   );
 };
 
-export default DoctorBrainDashboard;
+
