@@ -107,7 +107,6 @@ def save_vtk_volume(volume: np.ndarray, spacing, output_path: str):
     image_data.SetSpacing(spacing[2], spacing[1], spacing[0])
     image_data.SetOrigin(0, 0, 0)
 
-    # ---- CRITICAL FIX: correct memory order for VTK ----
     volume_vtk = np.transpose(volume, (2, 1, 0))  # (x, y, z)
     volume_vtk = np.ascontiguousarray(volume_vtk, dtype=np.float32)
 

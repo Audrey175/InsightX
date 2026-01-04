@@ -51,13 +51,13 @@ export default function MRIViewer({
 
       const span = max - min;
 
-      // Color (grayscale)
+      // Color
       const ctfun = vtkColorTransferFunction.newInstance();
       ctfun.removeAllPoints();
       ctfun.addRGBPoint(min, 0, 0, 0);
       ctfun.addRGBPoint(max, 1, 1, 1);
 
-      // Opacity (MRI-friendly)
+      // Opacity 
       const ofun = vtkPiecewiseFunction.newInstance();
       ofun.removeAllPoints();
       ofun.addPoint(min, 1.0);

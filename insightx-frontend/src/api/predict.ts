@@ -13,7 +13,6 @@ export interface MRIPredictionResult {
 
   voxel_spacing: [number, number, number];
 
-  // Change this from reconstruction_image to reconstruction_file
   reconstruction_file: string; 
 
   reconstruction: {
