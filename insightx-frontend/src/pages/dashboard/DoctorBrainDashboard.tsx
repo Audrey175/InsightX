@@ -105,28 +105,18 @@ const DoctorBrainDashboard: React.FC = () => {
                 <p>
                   <p><strong>File analyzed:</strong> {prediction.filename}</p>
                   <strong>Tumor detected:</strong>{" "}
-                  {prediction.tumor_detected ? "Yes" : "No"}
-                </p>
-
-                <p>
-                  <strong>Risk score:</strong>{" "}
-                  {(prediction.risk_score * 100).toFixed(1)}%
+                  {prediction.segmentation.tumor_detected ? "Yes" : "No"}
                 </p>
 
                 <div className="mt-2">
-                  <strong>Tumor size (pixels):</strong>
-                  <ul className="ml-4 list-disc text-xs">
-                    <li>Core: {prediction.tumor_size_pixels.core}</li>
-                    <li>Enhancing: {prediction.tumor_size_pixels.enhancing}</li>
-                    <li>Whole: {prediction.tumor_size_pixels.whole}</li>
-                  </ul>
+                  <strong>Tumor size (pixels): {prediction.segmentation.tumor_size_pixels}</strong>
                 </div>
 
-                {prediction.tumor_location && (
+                {prediction.segmentation.tumor_location && (
                   <p className="mt-2">
                     <strong>Location:</strong>{" "}
-                    (x={prediction.tumor_location.x.toFixed(1)},
-                    y={prediction.tumor_location.y.toFixed(1)})
+                    (x={prediction.segmentation.tumor_location.x.toFixed(1)},
+                    y={prediction.segmentation.tumor_location.y.toFixed(1)})
                   </p>
                 )}
               </div>
@@ -188,32 +178,38 @@ const DoctorBrainDashboard: React.FC = () => {
           </div>
 
           {/* RIGHT PANELS */}
+          {prediction && (
           <div className="space-y-4 text-xs">
             <div className="bg-white rounded-2xl shadow-sm border p-4">
               <h2 className="font-semibold text-slate-800 mb-2">
-                Injury details
+                Disease details
               </h2>
               <div className="space-y-1 text-[11px] text-slate-700">
-                <p>Injury Location: {data.injury.location}</p>
-                <p>Injury Type: {data.injury.type}</p>
-                <p>Injury Size: {data.injury.size}</p>
-                <p>Edema Volume: {data.injury.edema}</p>
-                <p>Imaging Used: {data.injury.imaging.join(", ")}</p>
+                <p>Tumor Type: {prediction.classification.tumor_type}</p>
+                <p>Confidence: {prediction.classification.confidence}</p>
+                <p>Probabilities: </p>
+                <ul className="list-disc list-inside ml-4">
+                  <li>Glioma: {prediction.classification.probabilities.glioma}</li>
+                  <li>Meningioma: {prediction.classification.probabilities.meningioma}</li>
+                  <li>Notumor: {prediction.classification.probabilities.notumor}</li>
+                  <li>Pituitary: {prediction.classification.probabilities.pituitary}</li>
+                </ul>
               </div>
             </div>
-
+            {prediction && (
             <div className="bg-white rounded-2xl shadow-sm border p-4">
               <h2 className="font-semibold text-slate-800 mb-2">
                 Potential risk
               </h2>
               <ul className="list-disc list-inside text-[11px] text-slate-700 space-y-1">
-                {data.risks.map((r, idx) => (
+                {prediction.risk_analysis.risks.map((r, idx) => (
                   <li key={idx}>{r}</li>
                 ))}
               </ul>
             </div>
+            )}
 
-            <div className="bg-white rounded-2xl shadow-sm border p-4">
+            {/* <div className="bg-white rounded-2xl shadow-sm border p-4">
               <h2 className="font-semibold text-slate-800 mb-2">
                 Related cases
               </h2>
@@ -222,8 +218,9 @@ const DoctorBrainDashboard: React.FC = () => {
                   <li key={idx}>{c}</li>
                 ))}
               </ul>
-            </div>
+            </div> */}
           </div>
+          )}
         </div>
       </div>
     </DashboardLayout>

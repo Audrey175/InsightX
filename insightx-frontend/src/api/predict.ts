@@ -1,16 +1,27 @@
 export interface PredictionResult {
   filename: string;
-  tumor_detected: boolean;
-  tumor_size_pixels: {
-    core: number;
-    enhancing: number;
-    whole: number;
+  segmentation: {
+    tumor_detected: boolean;
+    tumor_size_pixels: number;
+    tumor_location: {
+      x: number;
+      y: number;
+    } | null;
+    
   };
-  tumor_location: {
-    x: number;
-    y: number;
-  } | null;
-  risk_score: number;
+  classification: {
+    tumor_type: "glioma" | "meningioma" | "notumor" | "pituitary";
+    confidence: number;
+    probabilities: {
+      glioma: number;
+      meningioma: number;
+      notumor: number;
+      pituitary: number;
+    }
+  };
+  risk_analysis: {
+    risks: string[];
+  };
 }
 
 export async function predictMRI(file: File): Promise<PredictionResult>{
