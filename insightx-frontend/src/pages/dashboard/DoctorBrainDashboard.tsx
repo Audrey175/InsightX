@@ -151,8 +151,11 @@ const DoctorBrainDashboard: React.FC = () => {
 
             <div className="flex gap-4">
              <div className="flex-1 flex items-center justify-center">
-  {prediction ? (
-  <MRIViewer modelUrl={`http://localhost:8000${prediction.reconstruction_image}`} />
+  {prediction?.reconstruction?.status === "success" ? (
+  <MRIViewer
+  key={prediction.reconstruction_file}
+  volumeUrl={`http://localhost:8000${prediction.reconstruction_file}`}/>
+
 ) : (
   <img src={BrainHero} alt="Placeholder" className="max-h-56 object-contain opacity-40" />
 )}

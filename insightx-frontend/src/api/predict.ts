@@ -11,13 +11,14 @@ export interface MRIPredictionResult {
     width: number;
   };
 
-  voxel_spacing: number[];
+  voxel_spacing: [number, number, number];
 
-  reconstruction_image: string; 
+  // Change this from reconstruction_image to reconstruction_file
+  reconstruction_file: string; 
 
   reconstruction: {
-    status: string;
-    method: string;
+    status: "success" | "failed";
+    method: "VTK GPU Volume Rendering";
   };
 
   statistics: {
@@ -27,8 +28,6 @@ export interface MRIPredictionResult {
 
   disclaimer: string;
 }
-
-
 
 export async function predictMRI(
   file: File
