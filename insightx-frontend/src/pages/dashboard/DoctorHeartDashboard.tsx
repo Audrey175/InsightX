@@ -1,18 +1,31 @@
-import React, { useState} from "react";
+// import React, { useState} from "react";
 import { predictXRay } from "../../api/xray_predict";
 import type { XRayPredictionResult } from "../../api/xray_predict";
-import { useParams, useNavigate } from "react-router-dom";
-import DashboardLayout from "../../layouts/DashboardLayout";
+// import { useParams, useNavigate } from "react-router-dom";
 // import HeartHero from "../../assets/researchers.png";
 import {
   findPatientById,
   getDoctorHeartFor,
   patients,
 } from "../../data/fakeDatabase";
+import React, { useEffect, useState } from "react";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
+// import { jsPDF } from "jspdf";
+import DashboardLayout from "../../layouts/DashboardLayout";
+// import HeartHero from "../../assets/researchers.png";
 import PatientSelector from "../../components/PatientSelector";
+// import { fetchDoctorHeartScan } from "../../services/doctorService";
+// import type { DoctorHeartScanRecord } from "../../data/doctorHeartData";
+// import { LoadingState } from "../../components/ui/LoadingState";
+// import { ErrorState } from "../../components/ui/ErrorState";
+// import { getLatestDoneSession, getSession } from "../../services/localScanStore";
+// import { findPatientById } from "../../data/fakeDatabase";
+import { Button } from "../../components/ui/button";
+
 
 const DoctorHeartDashboard: React.FC = () => {
   const { patientId } = useParams<{ patientId: string }>();
+  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
 
   const patient = findPatientById(patientId) ?? patients[0];
@@ -42,7 +55,7 @@ const DoctorHeartDashboard: React.FC = () => {
 
   return (
     <DashboardLayout>
-      <div className="space-y-4">
+      <div className="space-y-4 min-w-0">
         {/* HEADER */}
         <div className="flex items-center justify-between">
           <div>
