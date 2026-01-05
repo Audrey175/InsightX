@@ -133,7 +133,7 @@ const DoctorHeartDashboard: React.FC = () => {
     const doc = new jsPDF();
     doc.text("InsightX Heart Diagnostic Report", 10, 20);
     doc.text(`Patient: ${scan.patientName}`, 10, 30);
-    doc.text(`BPM: ${scan.bpm}`, 10, 40);
+    doc.text(`BPM: ${scan.heartRate}`, 10, 40);
     doc.save(`Heart_Report_${scan.patientId}.pdf`);
   };
 
