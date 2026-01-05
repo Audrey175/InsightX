@@ -8,6 +8,7 @@ from backend.routes.predict_xray import router as xray_router
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from backend.modules.mri_service import analyze_dicom_zip
+from fastapi.staticfiles import StaticFiles
 
 
 
@@ -42,6 +43,7 @@ app.mount(
     name="static"
 )
 
+app.mount("/outputs", StaticFiles(directory="backend/heatmaps"), name="outputs")
 
 @app.get("/")
 def root():

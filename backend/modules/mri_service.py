@@ -8,6 +8,8 @@ import vtk
 from vtk.util import numpy_support
 import scipy.ndimage as ndimage
 import h5py
+from backend.modules.heatmap import generate_heatmap_slice
+
 
 def is_valid_dicom_file(path: str) -> bool:
     name = os.path.basename(path)
@@ -86,7 +88,7 @@ def save_h5(volume, spacing, series_uid, out_path):
             compression_opts=4,
         )
         f.attrs["spacing"] = spacing
-        f.attrs["series_uid"] = series_uid
+        f.attrs["series_uid"] = series_uid.encode("utf-8")
 
 
 def load_h5(h5_path):
@@ -169,22 +171,32 @@ def analyze_dicom_zip(zip_path: str):
         recon_dir = os.path.join("backend", "static", "reconstructions")
         os.makedirs(recon_dir, exist_ok=True)
 
-        # --- Save canonical HDF5 ---
+        # --- Save HDF5 ---
         h5_filename = f"{series_uid}.h5"
         h5_path = os.path.join(recon_dir, h5_filename)
         save_h5(volume, spacing, series_uid, h5_path)
 
-        # --- Generate VTK for visualization ---
-        vti_filename = "mri_volume.vti"
+        # --- Save VTK ---
+        vti_filename = f"{series_uid}.vti"
         vti_path = os.path.join(recon_dir, vti_filename)
         save_vtk_volume(volume, spacing, vti_path)
+
+        # --- Generate heatmap ---
+        heatmap_filename = f"{series_uid}_heatmap.png"
+        heatmap_path = os.path.join(recon_dir, heatmap_filename)
+
+        generate_heatmap_slice(
+            volume,
+            heatmap_path,
+            slice_axis=0
+        )
 
         d, h, w = volume.shape
 
         return {
             "modality": "medical_volume",
             "input_type": "dicom_zip",
-            "series_used": series_uid,
+            "series_uid": series_uid,
             "series_detected": series_count,
             "volume_shape": {
                 "depth": int(d),
@@ -194,13 +206,10 @@ def analyze_dicom_zip(zip_path: str):
             "voxel_spacing": spacing,
             "canonical_volume_file": f"/static/reconstructions/{h5_filename}",
             "reconstruction_file": f"/static/reconstructions/{vti_filename}",
-            "reconstruction": {
-                "status": "success",
-                "method": "VTK GPU Volume Rendering",
-            },
+            "heatmap_slice": f"/static/reconstructions/{heatmap_filename}",
             "statistics": {
                 "mean_intensity": round(float(volume.mean()), 4),
                 "max_intensity": round(float(volume.max()), 4),
             },
-            "disclaimer": "This AI system is for research and decision support only.",
+            "disclaimer": "This AI system is for research and decision support only."
         }

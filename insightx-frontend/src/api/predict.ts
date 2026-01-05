@@ -15,6 +15,8 @@ export interface MRIPredictionResult {
 
   reconstruction_file: string; 
 
+  heatmap_slice: string;
+
   reconstruction: {
     status: "success" | "failed";
     method: "VTK GPU Volume Rendering";

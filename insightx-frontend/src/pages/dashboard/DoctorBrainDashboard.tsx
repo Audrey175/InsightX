@@ -1,9 +1,10 @@
-import React, { useState} from "react";
+import React, { useState } from "react";
 import { predictMRI } from "../../api/predict";
 import type { MRIPredictionResult } from "../../api/predict";
 import { useParams, useNavigate } from "react-router-dom";
 import DashboardLayout from "../../layouts/DashboardLayout";
 import MRIViewer from "../../components/dashboard/MRI_Viewer";
+import HeatmapViewer from "../../components/dashboard/HeatmapViewer";
 import BrainHero from "../../assets/brainhome.png";
 import {
   findPatientById,
@@ -13,12 +14,15 @@ import {
 import PatientSelector from "../../components/PatientSelector";
 
 const DoctorBrainDashboard: React.FC = () => {
+  const [viewMode, setViewMode] = useState<"heatmap" | "volume">("heatmap");
   const { patientId } = useParams<{ patientId: string }>();
   const navigate = useNavigate();
   const patient = findPatientById(patientId) ?? patients[0];
   const data = getDoctorBrainFor(patient.id)!;
-  
-  const [prediction, setPrediction] = useState<MRIPredictionResult | null>(null);
+
+  const [prediction, setPrediction] = useState<MRIPredictionResult | null>(
+    null
+  );
 
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
@@ -29,16 +33,16 @@ const DoctorBrainDashboard: React.FC = () => {
 
     setPrediction(null);
     setError(null);
-    setLoading(true)
+    setLoading(true);
 
     try {
-    const result = await predictMRI(file);
-    console.log("API RESULT:", result);   
-    setPrediction(result);
+      const result = await predictMRI(file);
+      console.log("API RESULT:", result);
+      setPrediction(result);
     } catch (err) {
-  console.error("MRI ERROR:", err);
-  setError("Failed to analyze MRI. Please try again.");
-} finally {
+      console.error("MRI ERROR:", err);
+      setError("Failed to analyze MRI. Please try again.");
+    } finally {
       setLoading(false);
     }
   };
@@ -83,7 +87,9 @@ const DoctorBrainDashboard: React.FC = () => {
         <div className="grid grid-cols-[minmax(0,1.6fr)_minmax(0,1.4fr)] gap-4">
           {/* LEFT PANEL */}
           <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 mt-2">
-            <h2 className="text-xs font-semibold text-slate-700 mb-2">AI MRI Diagnosis</h2>
+            <h2 className="text-xs font-semibold text-slate-700 mb-2">
+              AI MRI Diagnosis
+            </h2>
             <input
               type="file"
               accept=".zip"
@@ -95,53 +101,48 @@ const DoctorBrainDashboard: React.FC = () => {
               <p className="text-blue-600 font-medium">Analyzing MRI...</p>
             )}
 
-            {error && (
-              <p className="text-red-600 font-medium">{error}</p>
-            )}
+            {error && <p className="text-red-600 font-medium">{error}</p>}
 
             {prediction && (
-  <div className="bg-slate-100 p-4 rounded-xl mt-4 text-sm space-y-2">
-    <h3 className="font-semibold text-slate-800 mb-2">
-      MRI Reconstruction Summary
-    </h3>
+              <div className="bg-slate-100 p-4 rounded-xl mt-4 text-sm space-y-2">
+                <h3 className="font-semibold text-slate-800 mb-2">
+                  MRI Reconstruction Summary
+                </h3>
 
-    <p>
-      <strong>Series used:</strong> {prediction.series_used}
-    </p>
+                <p>
+                  <strong>Series used:</strong> {prediction.series_used}
+                </p>
 
-    <p>
-      <strong>Series detected:</strong> {prediction.series_detected}
-    </p>
+                <p>
+                  <strong>Series detected:</strong> {prediction.series_detected}
+                </p>
 
-    <p>
-      <strong>Volume shape:</strong>{" "}
-      {prediction.volume_shape.depth} ×{" "}
-      {prediction.volume_shape.height} ×{" "}
-      {prediction.volume_shape.width}
-    </p>
+                <p>
+                  <strong>Volume shape:</strong> {prediction.volume_shape.depth}{" "}
+                  × {prediction.volume_shape.height} ×{" "}
+                  {prediction.volume_shape.width}
+                </p>
 
-    <p>
-      <strong>Voxel spacing (mm):</strong>{" "}
-      {prediction.voxel_spacing.join(", ")}
-    </p>
+                <p>
+                  <strong>Voxel spacing (mm):</strong>{" "}
+                  {prediction.voxel_spacing.join(", ")}
+                </p>
 
-    <p>
-      <strong>Mean intensity:</strong>{" "}
-      {prediction.statistics.mean_intensity}
-    </p>
+                <p>
+                  <strong>Mean intensity:</strong>{" "}
+                  {prediction.statistics.mean_intensity}
+                </p>
 
-    <p>
-      <strong>Max intensity:</strong>{" "}
-      {prediction.statistics.max_intensity}
-    </p>
+                <p>
+                  <strong>Max intensity:</strong>{" "}
+                  {prediction.statistics.max_intensity}
+                </p>
 
-    <p className="text-xs text-slate-500 mt-2">
-      {prediction.disclaimer}
-    </p>
-  </div>
-)}
-
-            
+                <p className="text-xs text-slate-500 mt-2">
+                  {prediction.disclaimer}
+                </p>
+              </div>
+            )}
           </div>
           <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-4 flex flex-col gap-4">
             <div className="flex justify-between items-center text-xs text-slate-500">
@@ -150,18 +151,23 @@ const DoctorBrainDashboard: React.FC = () => {
             </div>
 
             <div className="flex gap-4">
-             <div className="flex-1 flex items-center justify-center">
-  {prediction?.reconstruction?.status === "success" ? (
-  <MRIViewer
-  key={prediction.reconstruction_file}
-  volumeUrl={`http://localhost:8000${prediction.reconstruction_file}`}/>
-
-) : (
-  <img src={BrainHero} alt="Placeholder" className="max-h-56 object-contain opacity-40" />
-)}
-</div>
-
-
+              <div className="flex-1 flex items-center justify-center">
+                {prediction && viewMode === "heatmap" ? (
+                  <HeatmapViewer
+                    imageUrl={`http://localhost:8000${prediction?.heatmap_slice}`}
+                  />
+                ) : prediction && viewMode === "volume" ? (
+                  <MRIViewer
+                    volumeUrl={`http://localhost:8000${prediction?.reconstruction_file}`}
+                  />
+                ) : (
+                  <img
+                    src={BrainHero}
+                    alt="Placeholder"
+                    className="max-h-56 object-contain opacity-40"
+                  />
+                )}
+              </div>
 
               <div className="w-60 space-y-3 text-xs">
                 <div className="bg-slate-50 rounded-xl p-3">
@@ -190,13 +196,32 @@ const DoctorBrainDashboard: React.FC = () => {
             </div>
 
             <div className="flex gap-3 text-xs">
-              <button className="px-4 py-1.5 rounded-full bg-sky-700 text-white font-medium">
+              <button
+                onClick={() => setViewMode("volume")}
+                className={`px-4 py-1.5 rounded-full font-medium ${
+                  viewMode === "volume"
+                    ? "bg-sky-700 text-white"
+                    : "bg-slate-100 text-slate-700"
+                }`}
+              >
                 3D
               </button>
-              <button className="px-4 py-1.5 rounded-full bg-slate-100 text-slate-700">
+
+              <button
+                onClick={() => setViewMode("heatmap")}
+                className={`px-4 py-1.5 rounded-full font-medium ${
+                  viewMode === "heatmap"
+                    ? "bg-sky-700 text-white"
+                    : "bg-slate-100 text-slate-700"
+                }`}
+              >
                 Heat map
               </button>
-              <button className="px-4 py-1.5 rounded-full bg-slate-100 text-slate-700">
+
+              <button
+                disabled
+                className="px-4 py-1.5 rounded-full bg-slate-100 text-slate-400 cursor-not-allowed"
+              >
                 Raw
               </button>
             </div>

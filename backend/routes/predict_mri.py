@@ -12,8 +12,5 @@ async def predict_mri(file: UploadFile = File(...)):
         tmp_path = tmp.name
 
     result = analyze_dicom_zip(tmp_path)
+    return result
 
-    return {
-        "filename": file.filename,
-        **result
-    }

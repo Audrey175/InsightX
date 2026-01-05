@@ -1,98 +1,97 @@
-import { useEffect, useRef } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 import vtkGenericRenderWindow from "vtk.js/Sources/Rendering/Misc/GenericRenderWindow";
 import vtkXMLImageDataReader from "vtk.js/Sources/IO/XML/XMLImageDataReader";
 import vtkVolume from "vtk.js/Sources/Rendering/Core/Volume";
 import vtkVolumeMapper from "vtk.js/Sources/Rendering/Core/VolumeMapper";
-import vtkColorTransferFunction from "vtk.js/Sources/Rendering/Core/ColorTransferFunction";
-import vtkPiecewiseFunction from "vtk.js/Sources/Common/DataModel/PiecewiseFunction";
+import "vtk.js/Sources/Rendering/OpenGL/RenderWindow";
 
-interface Statistics {
-  mean_intensity: number;
-  max_intensity: number;
-}
-
-export default function MRIViewer({
-  volumeUrl,
-  stats,
-}: {
-  volumeUrl: string;
-  stats?: Statistics;
-}) {
+export default function MRIViewer({ volumeUrl }: { volumeUrl: string }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const grwRef = useRef<any>(null);
+  const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    if (!containerRef.current || !volumeUrl) return;
+  useLayoutEffect(() => {
+    if (!volumeUrl) {
+      console.error("No volume URL provided");
+      return;
+    }
 
-    const reader = vtkXMLImageDataReader.newInstance();
+    // Delay until DOM is painted
+    const frameId = requestAnimationFrame(() => {
+      if (!containerRef.current) {
+        console.error("Container still null, cannot attach canvas");
+        return;
+      }
 
-    reader.setUrl(volumeUrl).then(() => {
-      const imageData = reader.getOutputData(0);
+      if (grwRef.current) return; // prevent double init
 
-      console.log("SCALARS:", imageData.getPointData().getScalars());
-      console.log("RANGE:", imageData.getPointData().getScalars().getRange());
-      const [min, max] = imageData.getPointData().getScalars().getRange();
+      try {
+        const grw = vtkGenericRenderWindow.newInstance();
+        grw.setContainer(containerRef.current);
 
-      const grw = vtkGenericRenderWindow.newInstance();
-      grw.setContainer(containerRef.current);
-
-      const renderer = grw.getRenderer();
-      const renderWindow = grw.getRenderWindow();
-
-      renderer.removeAllViewProps();
-
-      const mapper = vtkVolumeMapper.newInstance();
-      mapper.setInputData(imageData);
-      mapper.setSampleDistance(0.7);
-      mapper.setBlendModeToComposite();
-
-      const volume = vtkVolume.newInstance();
-      volume.setMapper(mapper);
-
-      const span = max - min;
-
-      // Color
-      const ctfun = vtkColorTransferFunction.newInstance();
-      ctfun.removeAllPoints();
-      ctfun.addRGBPoint(min, 0, 0, 0);
-      ctfun.addRGBPoint(max, 1, 1, 1);
-
-      // Opacity 
-      const ofun = vtkPiecewiseFunction.newInstance();
-      ofun.removeAllPoints();
-      ofun.addPoint(min, 1.0);
-      ofun.addPoint(max, 1.0);
-
-      const property = volume.getProperty();
-      property.setIndependentComponents(true);
-      property.setRGBTransferFunction(0, ctfun);
-      property.setScalarOpacity(0, ofun);
-      property.setInterpolationTypeToLinear();
-      property.setShade(true);
-      property.setAmbient(0.3);
-      property.setDiffuse(0.6);
-      property.setSpecular(0.2);
-
-      renderer.addVolume(volume);
-      renderer.resetCamera();
-
-      requestAnimationFrame(() => {
+        const { width, height } = containerRef.current.getBoundingClientRect();
+        const views = grw.getRenderWindow().getViews();
+        if (views.length > 0) {
+          views[0].setSize(width || 500, height || 500);
+        }
         grw.resize();
-        renderer.resetCameraClippingRange();
-        renderWindow.render();
-      });
 
-      grwRef.current = grw;
+        const renderer = grw.getRenderer();
+        const renderWindow = grw.getRenderWindow();
+        const reader = vtkXMLImageDataReader.newInstance();
+
+        // Manual fetch debug
+        fetch(volumeUrl)
+          .then(res => res.text())
+          .then(txt => {
+            console.log("Manual fetch succeeded, first 200 chars:", txt.slice(0, 200));
+          })
+          .catch(err => console.error("Manual fetch failed:", err));
+
+        reader.setUrl(volumeUrl).then(() => {
+          const imageData = reader.getOutputData();
+          if (!imageData) {
+            console.error("No image data parsed from VTI");
+            return;
+          }
+
+          const mapper = vtkVolumeMapper.newInstance();
+          mapper.setInputData(imageData);
+
+          const volume = vtkVolume.newInstance();
+          volume.setMapper(mapper);
+
+          renderer.addVolume(volume);
+          renderer.resetCamera();
+          renderWindow.render();
+
+          setLoading(false);
+        });
+
+        grwRef.current = grw;
+      } catch (err) {
+        console.error("VTK initialization failed:", err);
+      }
     });
 
     return () => {
-      grwRef.current?.delete();
+      cancelAnimationFrame(frameId);
+      if (grwRef.current) {
+        grwRef.current.delete();
+        grwRef.current = null;
+      }
     };
-  }, [volumeUrl, stats]);
+  }, [volumeUrl]);
 
   return (
-    <div className="w-full h-[500px] rounded-xl overflow-hidden bg-black">
+    <div className="relative w-full h-[600px] bg-black rounded-xl overflow-hidden">
       <div ref={containerRef} className="w-full h-full" />
+      {loading && (
+        <div className="absolute inset-0 flex items-center justify-center bg-black/50 text-white">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white mb-2" />
+          <span className="ml-3">Loading 3D Volume...</span>
+        </div>
+      )}
     </div>
   );
 }
