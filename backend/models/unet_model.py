@@ -1,10 +1,6 @@
 import torch
 import torch.nn as nn
 
-<<<<<<< HEAD
-=======
-
->>>>>>> main
 class DoubleConv(nn.Module):
     def __init__(self, in_ch, out_ch):
         super().__init__()
@@ -14,20 +10,12 @@ class DoubleConv(nn.Module):
             nn.ReLU(inplace=True),
             nn.Conv2d(out_ch, out_ch, 3, padding=1),
             nn.BatchNorm2d(out_ch),
-<<<<<<< HEAD
-            nn.ReLU(inplace=True)
-=======
             nn.ReLU(inplace=True),
->>>>>>> main
         )
 
     def forward(self, x):
         return self.conv(x)
 
-<<<<<<< HEAD
-=======
-
->>>>>>> main
 class UNet(nn.Module):
     def __init__(self, in_channels=4, num_classes=3):
         super().__init__()
@@ -56,8 +44,4 @@ class UNet(nn.Module):
         d1 = self.up1(d2)
         d1 = self.dec1(torch.cat([d1, e1], dim=1))
 
-<<<<<<< HEAD
         return self.out(d1)
-=======
-        return self.out(d1)
->>>>>>> main
