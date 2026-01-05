@@ -10,6 +10,8 @@ DATABASE_URL = "sqlite:///./insightx.db"
 CSV_FILE = "assignment3_II.csv"
 DB_FILE = "hospital.db"
 
+# SQLAlchemy engine (optional if you want ORM later)
+DATABASE_URL = f"sqlite:///{DB_FILE}"
 engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()

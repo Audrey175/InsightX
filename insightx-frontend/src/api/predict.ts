@@ -1,30 +1,52 @@
-export interface PredictionResult {
-  filename: string;
-  tumor_detected: boolean;
-  tumor_size_pixels: {
-    core: number;
-    enhancing: number;
-    whole: number;
+export interface MRIPredictionResult {
+  modality: "medical_volume";
+  input_type: "dicom_zip";
+
+  series_used: string;
+  series_detected: number;
+
+  volume_shape: {
+    depth: number;
+    height: number;
+    width: number;
   };
-  tumor_location: {
-    x: number;
-    y: number;
-  } | null;
-  risk_score: number;
+
+  voxel_spacing: [number, number, number];
+
+  reconstruction_file: string; 
+
+  heatmap_slice: string;
+
+  reconstruction: {
+    status: "success" | "failed";
+    method: "VTK GPU Volume Rendering";
+  };
+
+  statistics: {
+    mean_intensity: number;
+    max_intensity: number;
+  };
+
+  disclaimer: string;
 }
 
-export async function predictMRI(file: File): Promise<PredictionResult>{
+export async function predictMRI(
+  file: File
+): Promise<MRIPredictionResult> {
   const formData = new FormData();
   formData.append("file", file);
 
-  const response = await fetch("http://127.0.0.1:8000/predict", {
+  const response = await fetch("http://localhost:8000/predict/mri", {
     method: "POST",
     body: formData,
   });
 
   if (!response.ok) {
-    throw new Error(`API returned status ${response.status}`);
+    const errorText = await response.text();
+    throw new Error(
+      `MRI analysis failed (${response.status}): ${errorText}`
+    );
   }
-  return await response.json();
-  
+
+  return response.json();
 }

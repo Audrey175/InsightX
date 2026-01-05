@@ -29,6 +29,76 @@ lib/
 lib64/
 parts/
 sdist/
+node_modules/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+MANIFEST
+
+# Testing and coverage reports
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+nosetests.xml
+coverage.xml
+.cache/
+
+# IDE specific files
+# VS Code
+.vscode/settings.json
+.vscode/launch.json
+.vscode/tasks.json
+# JetBrains IDEs (PyCharm, WebStorm, etc.)
+.idea/
+
+# Database files (if using SQLite for local development)
+*.db
+*.sqlite
+*.sqlite3
+
+# Logs and runtime files
+*.log
+logs/
+*.pid
+instance/
+.webassets-cache
+
+# Operating System Files
+.DS_Store
+Thumbs.db
+Desktop.ini# Environment Variables (CRITICAL: Do not commit secrets!)
+.env
+.env.local
+.env.production
+.flaskenv
+
+# Python byte-code files and cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.so
+.Python
+
+# Virtual Environment Directories
+venv/
+env/
+ENV/
+.venv/
+
+# Build artifacts and distribution
+build/
+dist/
+develop-eggs/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
 var/
 wheels/
 *.egg-info/

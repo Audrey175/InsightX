@@ -1,11 +1,13 @@
-import React, { useState} from "react";
+import React, { useState } from "react";
 import { predictMRI } from "../../api/predict";
-import type { PredictionResult } from "../../api/predict";
+import type { MRIPredictionResult } from "../../api/predict";
 import { useParams, useNavigate } from "react-router-dom";
 import React, { useEffect, useState } from "react";
 import { useNavigate, useParams, useSearchParams, Link } from "react-router-dom";
 import { jsPDF } from "jspdf";
 import DashboardLayout from "../../layouts/DashboardLayout";
+import MRIViewer from "../../components/dashboard/MRI_Viewer";
+import HeatmapViewer from "../../components/dashboard/HeatmapViewer";
 import BrainHero from "../../assets/brainhome.png";
 import PatientSelector from "../../components/PatientSelector";
 import { fetchDoctorBrainScan } from "../../services/doctorService";
@@ -21,13 +23,17 @@ import {
 } from "../../services/predictionService";
 
 const DoctorBrainDashboard: React.FC = () => {
+  const [viewMode, setViewMode] = useState<"heatmap" | "volume">("heatmap");
   const { patientId } = useParams<{ patientId: string }>();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const patient = findPatientById(patientId) ?? patients[0];
   const data = getDoctorBrainFor(patient.id)!;
-  
-  const [prediction, setPrediction] = useState<PredictionResult  | null>(null);
+
+  const [prediction, setPrediction] = useState<MRIPredictionResult | null>(
+    null
+  );
+
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -37,13 +43,14 @@ const DoctorBrainDashboard: React.FC = () => {
 
     setPrediction(null);
     setError(null);
-    setLoading(true)
+    setLoading(true);
 
     try {
-    const result = await predictMRI(file);
-    console.log("API RESULT:", result);   // ← DEBUG
-    setPrediction(result);
-    } catch {
+      const result = await predictMRI(file);
+      console.log("API RESULT:", result);
+      setPrediction(result);
+    } catch (err) {
+      console.error("MRI ERROR:", err);
       setError("Failed to analyze MRI. Please try again.");
     } finally {
       setLoading(false);
@@ -248,10 +255,12 @@ const DoctorBrainDashboard: React.FC = () => {
         <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1.6fr)_minmax(0,1.4fr)] gap-4">
           {/* LEFT PANEL */}
           <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 mt-2">
-            <h2 className="text-xs font-semibold text-slate-700 mb-2">AI MRI Diagnosis</h2>
+            <h2 className="text-xs font-semibold text-slate-700 mb-2">
+              AI MRI Diagnosis
+            </h2>
             <input
               type="file"
-              accept="image/*"
+              accept=".zip"
               onChange={handleMRIUpload}
               className="text-xs"
             />
@@ -260,46 +269,48 @@ const DoctorBrainDashboard: React.FC = () => {
               <p className="text-blue-600 font-medium">Analyzing MRI...</p>
             )}
 
-            {error && (
-              <p className="text-red-600 font-medium">{error}</p>
-            )}
+            {error && <p className="text-red-600 font-medium">{error}</p>}
 
             {prediction && (
-              <div className="bg-slate-100 p-4 rounded-xl mt-4 text-sm space-y-1">
+              <div className="bg-slate-100 p-4 rounded-xl mt-4 text-sm space-y-2">
                 <h3 className="font-semibold text-slate-800 mb-2">
-                  AI Diagnosis Result
+                  MRI Reconstruction Summary
                 </h3>
 
                 <p>
-                  <p><strong>File analyzed:</strong> {prediction.filename}</p>
-                  <strong>Tumor detected:</strong>{" "}
-                  {prediction.tumor_detected ? "Yes" : "No"}
+                  <strong>Series used:</strong> {prediction.series_used}
                 </p>
 
                 <p>
-                  <strong>Risk score:</strong>{" "}
-                  {(prediction.risk_score * 100).toFixed(1)}%
+                  <strong>Series detected:</strong> {prediction.series_detected}
                 </p>
 
-                <div className="mt-2">
-                  <strong>Tumor size (pixels):</strong>
-                  <ul className="ml-4 list-disc text-xs">
-                    <li>Core: {prediction.tumor_size_pixels.core}</li>
-                    <li>Enhancing: {prediction.tumor_size_pixels.enhancing}</li>
-                    <li>Whole: {prediction.tumor_size_pixels.whole}</li>
-                  </ul>
-                </div>
+                <p>
+                  <strong>Volume shape:</strong> {prediction.volume_shape.depth}{" "}
+                  × {prediction.volume_shape.height} ×{" "}
+                  {prediction.volume_shape.width}
+                </p>
 
-                {prediction.tumor_location && (
-                  <p className="mt-2">
-                    <strong>Location:</strong>{" "}
-                    (x={prediction.tumor_location.x.toFixed(1)},
-                    y={prediction.tumor_location.y.toFixed(1)})
-                  </p>
-                )}
+                <p>
+                  <strong>Voxel spacing (mm):</strong>{" "}
+                  {prediction.voxel_spacing.join(", ")}
+                </p>
+
+                <p>
+                  <strong>Mean intensity:</strong>{" "}
+                  {prediction.statistics.mean_intensity}
+                </p>
+
+                <p>
+                  <strong>Max intensity:</strong>{" "}
+                  {prediction.statistics.max_intensity}
+                </p>
+
+                <p className="text-xs text-slate-500 mt-2">
+                  {prediction.disclaimer}
+                </p>
               </div>
             )}
-            
           </div>
           <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-4 flex flex-col gap-4">
             <div className="flex justify-between items-center text-xs text-slate-500">
@@ -309,16 +320,21 @@ const DoctorBrainDashboard: React.FC = () => {
 
             <div className="flex gap-4">
               <div className="flex-1 flex items-center justify-center">
-                <img
-                  src={BrainHero}
-                  alt="Brain visualization"
-                  className="max-h-56 object-contain"
-                />
-          <div className="space-y-4">
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-4 flex flex-col gap-4">
-              <div className="flex justify-between items-center text-xs text-slate-500">
-                <span>Cognitive Activity</span>
-                <span>3D | Heat map | Raw</span>
+                {prediction && viewMode === "heatmap" ? (
+                  <HeatmapViewer
+                    imageUrl={`http://localhost:8000${prediction?.heatmap_slice}`}
+                  />
+                ) : prediction && viewMode === "volume" ? (
+                  <MRIViewer
+                    volumeUrl={`http://localhost:8000${prediction?.reconstruction_file}`}
+                  />
+                ) : (
+                  <img
+                    src={BrainHero}
+                    alt="Placeholder"
+                    className="max-h-56 object-contain opacity-40"
+                  />
+                )}
               </div>
 
               <div className="flex flex-col lg:flex-row gap-4">
@@ -356,73 +372,35 @@ const DoctorBrainDashboard: React.FC = () => {
                 </div>
               </div>
 
-              <div className="flex gap-3 text-xs">
-                <button className="px-4 py-1.5 rounded-full bg-sky-700 text-white font-medium">
-                  3D
-                </button>
-                <button className="px-4 py-1.5 rounded-full bg-slate-100 text-slate-700">
-                  Heat map
-                </button>
-                <button className="px-4 py-1.5 rounded-full bg-slate-100 text-slate-700">
-                  Raw
-                </button>
-              </div>
-            </div>
+            <div className="flex gap-3 text-xs">
+              <button
+                onClick={() => setViewMode("volume")}
+                className={`px-4 py-1.5 rounded-full font-medium ${
+                  viewMode === "volume"
+                    ? "bg-sky-700 text-white"
+                    : "bg-slate-100 text-slate-700"
+                }`}
+              >
+                3D
+              </button>
 
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-4 space-y-3">
-              <div className="flex items-center justify-between text-xs text-slate-500">
-                <span>AI MRI Diagnosis</span>
-                <span>.h5 upload</span>
-              </div>
-              <input
-                type="file"
-                accept=".h5"
-                onChange={handleMriUpload}
-                className="text-xs"
-              />
+              <button
+                onClick={() => setViewMode("heatmap")}
+                className={`px-4 py-1.5 rounded-full font-medium ${
+                  viewMode === "heatmap"
+                    ? "bg-sky-700 text-white"
+                    : "bg-slate-100 text-slate-700"
+                }`}
+              >
+                Heat map
+              </button>
 
-              {mriLoading && (
-                <p className="text-xs text-slate-500">Analyzing MRI...</p>
-              )}
-
-              {mriError && <p className="text-xs text-red-600">{mriError}</p>}
-
-              {mriPrediction && (
-                <div className="bg-slate-50 rounded-xl p-3 text-xs space-y-1">
-                  <p className="font-semibold text-slate-800">
-                    AI Diagnosis Result
-                  </p>
-                  <p>
-                    <span className="font-medium">File:</span>{" "}
-                    {mriPrediction.filename}
-                  </p>
-                  <p>
-                    <span className="font-medium">Tumor detected:</span>{" "}
-                    {mriPrediction.tumor_detected ? "Yes" : "No"}
-                  </p>
-                  <p>
-                    <span className="font-medium">Risk score:</span>{" "}
-                    {(mriPrediction.risk_score * 100).toFixed(1)}%
-                  </p>
-                  <div>
-                    <p className="font-medium">Tumor size (pixels)</p>
-                    <ul className="ml-4 list-disc text-[11px]">
-                      <li>Core: {mriPrediction.tumor_size_pixels.core}</li>
-                      <li>
-                        Enhancing: {mriPrediction.tumor_size_pixels.enhancing}
-                      </li>
-                      <li>Whole: {mriPrediction.tumor_size_pixels.whole}</li>
-                    </ul>
-                  </div>
-                  {mriPrediction.tumor_location && (
-                    <p>
-                      <span className="font-medium">Location:</span> x=
-                      {mriPrediction.tumor_location.x.toFixed(1)}, y=
-                      {mriPrediction.tumor_location.y.toFixed(1)}
-                    </p>
-                  )}
-                </div>
-              )}
+              <button
+                disabled
+                className="px-4 py-1.5 rounded-full bg-slate-100 text-slate-400 cursor-not-allowed"
+              >
+                Raw
+              </button>
             </div>
           </div>
 
