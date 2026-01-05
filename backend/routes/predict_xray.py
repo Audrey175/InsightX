@@ -1,34 +1,12 @@
-<<<<<<< HEAD
-from fastapi import APIRouter, UploadFile, File
-import tempfile
-import os
-=======
 from fastapi import APIRouter, UploadFile, File, HTTPException
 import tempfile
 import os
 from pathlib import Path
->>>>>>> main
 
 from backend.modules.xray_service import analyze_xray
 
 router = APIRouter()
 
-<<<<<<< HEAD
-@router.post("/predict/xray")
-async def predict_xray(file: UploadFile = File(...)):
-    # Save image temporarily
-    with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as tmp:
-        tmp.write(await file.read())
-        tmp_path = tmp.name
-
-    # Pass FILE PATH
-    result = analyze_xray(tmp_path)
-
-    return {
-        "filename": file.filename,
-        **result
-    }
-=======
 
 @router.post("/predict/xray")
 async def predict_xray(file: UploadFile = File(...)):
@@ -58,4 +36,3 @@ async def predict_xray(file: UploadFile = File(...)):
         "filename": file.filename,
         **result,
     }
->>>>>>> main
