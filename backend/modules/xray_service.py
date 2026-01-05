@@ -12,7 +12,7 @@ device = "cuda" if torch.cuda.is_available() else "cpu"
 
 model = XRayCNN()
 model.load_state_dict(
-    torch.load("backend/models/xray_model.pth", map_location=device)
+    torch.load("backend/models/xray_model.pth", weights_only=True)
 )
 model.to(device)
 model.eval()

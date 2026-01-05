@@ -1,15 +1,14 @@
 import torch.nn as nn
 from torchvision import models
+from torchvision.models import ResNet18_Weights
 
 class XRayCNN(nn.Module):
     def __init__(self):
         super().__init__()
-        try:
-            backbone = models.resnet18(weights=None)
-        except TypeError:
-            backbone = models.resnet18(pretrained=False)
-        backbone.fc = nn.Linear(512, 1)
-        self.model = backbone
+        self.model = models.resnet18(
+            weights=ResNet18_Weights.DEFAULT
+        )
+        self.model.fc = nn.Linear(512, 1)
 
     def forward(self, x):
         return self.model(x)
