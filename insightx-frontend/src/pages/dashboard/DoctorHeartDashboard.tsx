@@ -8,8 +8,8 @@ import {
   getDoctorHeartFor,
   patients,
 } from "../../data/fakeDatabase";
-import React, { useEffect, useState } from "react";
-import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import React, { useState } from "react";
+import {  useNavigate, useParams } from "react-router-dom";
 // import { jsPDF } from "jspdf";
 import DashboardLayout from "../../layouts/DashboardLayout";
 // import HeartHero from "../../assets/researchers.png";
@@ -20,12 +20,11 @@ import PatientSelector from "../../components/PatientSelector";
 // import { ErrorState } from "../../components/ui/ErrorState";
 // import { getLatestDoneSession, getSession } from "../../services/localScanStore";
 // import { findPatientById } from "../../data/fakeDatabase";
-import { Button } from "../../components/ui/button";
 
 
 const DoctorHeartDashboard: React.FC = () => {
   const { patientId } = useParams<{ patientId: string }>();
-  const [searchParams] = useSearchParams();
+
   const navigate = useNavigate();
 
   const patient = findPatientById(patientId) ?? patients[0];
