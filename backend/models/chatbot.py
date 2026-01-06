@@ -34,7 +34,7 @@ STRICT RULES:
 """
 
 # 4. Create the route
-@router.post("/chat")
+@router.post("/")
 async def chat(request: ChatRequest):
     try:
         response = client.models.generate_content(
