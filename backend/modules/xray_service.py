@@ -8,15 +8,19 @@ from backend.models.cnn_model import XRayCNN
 # -----------------------
 # Load model ONCE
 # -----------------------
-device = "cuda" if torch.cuda.is_available() else "cpu"
+device = torch.device('cpu')
 
 model = XRayCNN()
-model.load_state_dict(
-    torch.load("backend/models/xray_model.pth", weights_only=True)
+
+state_dict = torch.load(
+    "backend/models/xray_model.pth", 
+    map_location=device, 
+    weights_only=True
 )
+
+model.load_state_dict(state_dict)
 model.to(device)
 model.eval()
-
 # -----------------------
 # Image preprocessing
 # -----------------------
