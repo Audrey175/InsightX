@@ -147,7 +147,9 @@ async def predict_mri(file: UploadFile = File(...)):
 
         # 3. Run AI analysis on the generated heatmap slice
         # The heatmap_slice path is absolute/relative from static, adjust accordingly
-        static_path = os.path.join(os.getcwd(), mri_data["heatmap_slice"].lstrip("/"))
+        heatmap_url_path = mri_data["heatmap_slice"]
+        relative_file_path = heatmap_url_path.replace("/static", "backend/static", 1).lstrip("/")
+        static_path = os.path.join(os.getcwd(), relative_file_path)
         ai_results = run_ai_analysis(static_path)
 
         # 4. Merge results
