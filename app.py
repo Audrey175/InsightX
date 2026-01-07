@@ -32,7 +32,7 @@ app.include_router(chatbot_router, prefix="/chat", tags=["Chatbot"])
 # 3. Static Files (One mount per directory)
 # Consolidating heatmaps/outputs to one mount point
 app.mount("/static", StaticFiles(directory="backend/static"), name="static")
-app.mount("/outputs", StaticFiles(directory="backend/heatmaps"), name="outputs")
+app.mount("/outputs", StaticFiles(directory="backend/static/reconstructions"), name="outputs")
 
 @app.get("/")
 async def root():
