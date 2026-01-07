@@ -72,7 +72,7 @@ class AIReconstructionEngine:
         final_volume = ndimage.zoom(
             output_volume, 
             (target_shape[0]/128, target_shape[1]/64, target_shape[2]/64), 
-            order=3
+            order=2
         )
         return final_volume
 
@@ -215,41 +215,39 @@ def analyze_dicom_zip(zip_path: str):
             zip_ref.extractall(tmpdir)
 
         # 2. Load the raw DICOM series into a 3D Volume
+        # Returns: volume (numpy), spacing (tuple), series_uid (str), series_count (int)
         volume, spacing, series_uid, series_count = load_dicom_series(tmpdir)
 
-        # 3. Setup output directories and define filenames
+        # 3. Setup output directories
         recon_dir = os.path.join("backend", "static", "reconstructions")
         os.makedirs(recon_dir, exist_ok=True)
 
-        # --- ENSURE THESE FILENAMES ARE DEFINED HERE ---
+        # Define file paths
         h5_filename = f"{series_uid}.h5"
-        vti_filename = f"{series_uid}.vti"
-        heatmap_filename = f"{series_uid}_heatmap.png"
-
         h5_path = os.path.join(recon_dir, h5_filename)
+        
+        vti_filename = f"{series_uid}.vti"
         vti_path = os.path.join(recon_dir, vti_filename)
+        
+        heatmap_filename = f"{series_uid}_heatmap.png"
         heatmap_path = os.path.join(recon_dir, heatmap_filename)
 
-        # 4. Save Raw HDF5 for your teammate
+        # 4. Save Raw HDF5 (CRITICAL for your teammate's research/data analysis)
         save_h5(volume, spacing, series_uid, h5_path)
 
         # 5. Execute AI Reconstruction Engine (3D U-Net + Grad-CAM)
+        # We target 256 depth for high-quality VTK rendering
         engine = AIReconstructionEngine()
-        TARGET_SHAPE = (256, 128, 128)
         ai_volume = engine.analyze_volume(
             volume, 
-            target_shape=TARGET_SHAPE, 
+            target_shape=(256, 128, 128), 
             heatmap_path=heatmap_path
         )
 
-        # 6. Calculate new spacing and save VTK (.vti)
-        d, h, w = volume.shape
-        ai_spacing = (
-            spacing[0] * d / TARGET_SHAPE[0],
-            spacing[1] * h / TARGET_SHAPE[1],
-            spacing[2] * w / TARGET_SHAPE[2]
-        )
-        save_vtk_volume(ai_volume, ai_spacing, vti_path)
+        # 6. Save the AI-enhanced volume as VTK (.vti) for the frontend 3D viewer
+        save_vtk_volume(ai_volume, spacing, vti_path)
+
+        d, h, w = ai_volume.shape
 
         # 7. Return metadata to the frontend
         return {
@@ -260,11 +258,11 @@ def analyze_dicom_zip(zip_path: str):
             "series_uid": series_uid,
             "series_detected": series_count,
             "volume_shape": {
-                "depth": int(ai_volume.shape[0]),
-                "height": int(ai_volume.shape[1]),
-                "width": int(ai_volume.shape[2]),
+                "depth": int(d),
+                "height": int(h),
+                "width": int(w),
             },
-            "voxel_spacing": ai_spacing,
+            "voxel_spacing": spacing,
             "canonical_volume_file": f"/static/reconstructions/{h5_filename}",
             "reconstruction_file": f"/static/reconstructions/{vti_filename}",
             "heatmap_slice": f"/static/reconstructions/{heatmap_filename}",
