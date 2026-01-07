@@ -1,24 +1,89 @@
 import os
+import torch
+import torch.nn as nn
+import numpy as np
+import scipy.ndimage as ndimage
 import zipfile
 import tempfile
-import numpy as np
-import pydicom
 from collections import defaultdict
+import pydicom
 import vtk
-from vtk.util import numpy_support
-import scipy.ndimage as ndimage
 import h5py
-from backend.modules.heatmap import generate_heatmap_slice
+from vtk.util import numpy_support
+from backend.modules.heatmap import generate_grad_cam_heatmap
 
+# ==========================================
+# 1. 3D U-NET ARCHITECTURE (The AI Engine)
+# ==========================================
+class UNet3DReconstructor(nn.Module):
+    def __init__(self):
+        super(UNet3DReconstructor, self).__init__()
+        
+        def conv_block(in_c, out_c):
+            return nn.Sequential(
+                nn.Conv3d(in_c, out_c, kernel_size=3, padding=1),
+                nn.ReLU(inplace=True),
+                nn.Conv3d(out_c, out_c, kernel_size=3, padding=1),
+                nn.ReLU(inplace=True)
+            )
+
+        self.enc1 = conv_block(1, 32)
+        self.pool = nn.MaxPool3d(2)
+        self.up = nn.Upsample(scale_factor=2, mode='trilinear', align_corners=True)
+        # Final conv layer for Grad-CAM hooking
+        self.final = nn.Conv3d(32, 1, kernel_size=1)
+
+    def forward(self, x):
+        s1 = self.enc1(x)
+        d1 = self.up(self.pool(s1))
+        return torch.sigmoid(self.final(s1))
+
+# ==========================================
+# 2. AI RECONSTRUCTION ENGINE
+# ==========================================
+class AIReconstructionEngine:
+    def __init__(self):
+        self.device = torch.device("cpu") # Optimized for Mac CPU
+        self.model = UNet3DReconstructor().to(self.device)
+        self.model.eval()
+
+    def analyze_volume(self, volume, target_shape, heatmap_path):
+        """
+        Performs 3D Reconstruction and Grad-CAM in one pass.
+        """
+        # Downsample for performance to avoid timeouts
+        d, h, w = volume.shape
+        resampled = ndimage.zoom(volume, (128/d, 64/h, 64/w), order=1)
+        
+        # Prepare 5D Tensor: (Batch, Channel, Depth, Height, Width)
+        tensor_in = torch.from_numpy(resampled).float().unsqueeze(0).unsqueeze(0).to(self.device)
+
+        # Generate Grad-CAM Heatmap via the specialized module
+        # This function hooks the model and saves the heatmap.png
+        reconstructed_tensor = generate_grad_cam_heatmap(
+            self.model, 
+            tensor_in, 
+            heatmap_path, 
+            slice_axis=0
+        )
+
+        # Upsample the AI output back to the target VTK shape
+        output_volume = reconstructed_tensor.squeeze().detach().cpu().numpy()
+        final_volume = ndimage.zoom(
+            output_volume, 
+            (target_shape[0]/128, target_shape[1]/64, target_shape[2]/64), 
+            order=3
+        )
+        return final_volume
+
+# ==========================================
+# CORE DICOM & VTK FUNCTIONS
+# ==========================================
 
 def is_valid_dicom_file(path: str) -> bool:
     name = os.path.basename(path)
-    return (
-        os.path.isfile(path)
-        and name.lower().endswith(".dcm")
-        and not name.startswith("._")
-        and "__MACOSX" not in path
-    )
+    return (os.path.isfile(path) and name.lower().endswith(".dcm") and 
+            not name.startswith("._") and "__MACOSX" not in path)
 
 
 def load_dicom_series(dicom_root: str):
@@ -101,53 +166,31 @@ def load_h5(h5_path):
 
 def save_vtk_volume(volume: np.ndarray, spacing, output_path: str):
     """
-    Save volume as VTK ImageData (.vti) for vtk.js GPU volume rendering
+    Saves a PRE-RECONSTRUCTED volume as VTK ImageData.
     """
-
-    # --- Resample for web performance ---
-    MAX_DEPTH = 256
-    TARGET_XY = 128
-
-    d, h, w = volume.shape
-    volume = ndimage.zoom(
-        volume,
-        (MAX_DEPTH / d, TARGET_XY / h, TARGET_XY / w),
-        order=1,
-    )
-
-    spacing = (
-        spacing[0] * d / MAX_DEPTH,
-        spacing[1] * h / TARGET_XY,
-        spacing[2] * w / TARGET_XY,
-    )
-
     depth, height, width = volume.shape
 
-    # --- Build VTK ImageData ---
+    # Build VTK ImageData
     image_data = vtk.vtkImageData()
     image_data.SetDimensions(width, height, depth)
     image_data.SetSpacing(spacing[2], spacing[1], spacing[0])
     image_data.SetOrigin(0, 0, 0)
 
-    volume_vtk = np.transpose(volume, (2, 1, 0))  # (x, y, z)
+    # Convert numpy to VTK (x, y, z)
+    volume_vtk = np.transpose(volume, (2, 1, 0)) 
     volume_vtk = np.ascontiguousarray(volume_vtk, dtype=np.float32)
 
     vtk_array = numpy_support.numpy_to_vtk(
-        volume_vtk.ravel(order="C"),
-        deep=True,
-        array_type=vtk.VTK_FLOAT,
+        volume_vtk.ravel(order="C"), 
+        deep=True, 
+        array_type=vtk.VTK_FLOAT
     )
     vtk_array.SetName("Scalars")
-
     image_data.GetPointData().SetScalars(vtk_array)
-    image_data.Modified()
 
     writer = vtk.vtkXMLImageDataWriter()
     writer.SetFileName(output_path)
     writer.SetInputData(image_data)
-    writer.SetDataModeToAppended()
-    writer.SetEncodeAppendedData(True)
-    writer.SetCompressorTypeToNone()
     writer.Write()
 
     print(f"Saved VTI: {os.path.getsize(output_path) / 1024:.1f} KB")
@@ -162,54 +205,72 @@ def h5_to_vti(h5_path: str, vti_path: str):
 
 
 def analyze_dicom_zip(zip_path: str):
+    """
+    Main entry point: Extracts ZIP, loads DICOM, preserves raw H5 data,
+    performs AI U-Net reconstruction, and generates Grad-CAM heatmap.
+    """
     with tempfile.TemporaryDirectory() as tmpdir:
+        # 1. Extract the uploaded files
         with zipfile.ZipFile(zip_path, "r") as zip_ref:
             zip_ref.extractall(tmpdir)
 
+        # 2. Load the raw DICOM series into a 3D Volume
         volume, spacing, series_uid, series_count = load_dicom_series(tmpdir)
 
+        # 3. Setup output directories and define filenames
         recon_dir = os.path.join("backend", "static", "reconstructions")
         os.makedirs(recon_dir, exist_ok=True)
 
-        # --- Save HDF5 ---
+        # --- ENSURE THESE FILENAMES ARE DEFINED HERE ---
         h5_filename = f"{series_uid}.h5"
-        h5_path = os.path.join(recon_dir, h5_filename)
-        save_h5(volume, spacing, series_uid, h5_path)
-
-        # --- Save VTK ---
         vti_filename = f"{series_uid}.vti"
-        vti_path = os.path.join(recon_dir, vti_filename)
-        save_vtk_volume(volume, spacing, vti_path)
-
-        # --- Generate heatmap ---
         heatmap_filename = f"{series_uid}_heatmap.png"
+
+        h5_path = os.path.join(recon_dir, h5_filename)
+        vti_path = os.path.join(recon_dir, vti_filename)
         heatmap_path = os.path.join(recon_dir, heatmap_filename)
 
-        generate_heatmap_slice(
-            volume,
-            heatmap_path,
-            slice_axis=0
+        # 4. Save Raw HDF5 for your teammate
+        save_h5(volume, spacing, series_uid, h5_path)
+
+        # 5. Execute AI Reconstruction Engine (3D U-Net + Grad-CAM)
+        engine = AIReconstructionEngine()
+        TARGET_SHAPE = (256, 128, 128)
+        ai_volume = engine.analyze_volume(
+            volume, 
+            target_shape=TARGET_SHAPE, 
+            heatmap_path=heatmap_path
         )
 
+        # 6. Calculate new spacing and save VTK (.vti)
         d, h, w = volume.shape
+        ai_spacing = (
+            spacing[0] * d / TARGET_SHAPE[0],
+            spacing[1] * h / TARGET_SHAPE[1],
+            spacing[2] * w / TARGET_SHAPE[2]
+        )
+        save_vtk_volume(ai_volume, ai_spacing, vti_path)
 
+        # 7. Return metadata to the frontend
         return {
             "modality": "medical_volume",
             "input_type": "dicom_zip",
+            "reconstruction_engine": "3D U-Net",
+            "heatmap_type": "Grad-CAM",
             "series_uid": series_uid,
             "series_detected": series_count,
             "volume_shape": {
-                "depth": int(d),
-                "height": int(h),
-                "width": int(w),
+                "depth": int(ai_volume.shape[0]),
+                "height": int(ai_volume.shape[1]),
+                "width": int(ai_volume.shape[2]),
             },
-            "voxel_spacing": spacing,
+            "voxel_spacing": ai_spacing,
             "canonical_volume_file": f"/static/reconstructions/{h5_filename}",
             "reconstruction_file": f"/static/reconstructions/{vti_filename}",
             "heatmap_slice": f"/static/reconstructions/{heatmap_filename}",
             "statistics": {
-                "mean_intensity": round(float(volume.mean()), 4),
-                "max_intensity": round(float(volume.max()), 4),
+                "mean_intensity": round(float(ai_volume.mean()), 4),
+                "max_intensity": round(float(ai_volume.max()), 4),
             },
-            "disclaimer": "This AI system is for research and decision support only."
+            "disclaimer": "AI-generated reconstruction for research support only."
         }

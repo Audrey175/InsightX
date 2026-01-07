@@ -1,51 +1,37 @@
 export interface MRIPredictionResult {
-  modality: "medical_volume";
-  input_type: "dicom_zip";
-
-  series_used: string;
+  modality: string;
+  reconstruction_engine: string; 
+  series_uid: string;
   series_detected: number;
-
-  volume_shape: {
-    depth: number;
-    height: number;
-    width: number;
+  volume_shape: { depth: number; height: number; width: number };
+  voxel_spacing: [number, number, number]; // Better to define as a fixed triple
+  reconstruction_file: string; // The .vti file
+  heatmap_slice: string;       // The Grad-CAM .png
+  canonical_volume_file: string; // ADDED: The .h5 file for your teammate
+  statistics: { 
+    mean_intensity: number; 
+    max_intensity: number; 
   };
-
-  voxel_spacing: [number, number, number];
-
-  reconstruction_file: string; 
-
-  heatmap_slice: string;
-
-  reconstruction: {
-    status: "success" | "failed";
-    method: "VTK GPU Volume Rendering";
+  ai_analysis?: {
+    classification: { tumor_type: string; confidence: number };
+    risk_analysis: { risks: string[] };
   };
-
-  statistics: {
-    mean_intensity: number;
-    max_intensity: number;
-  };
-
   disclaimer: string;
 }
 
-export async function predictMRI(
-  file: File
-): Promise<MRIPredictionResult> {
+export async function predictMRI(file: File): Promise<MRIPredictionResult> {
   const formData = new FormData();
   formData.append("file", file);
 
-  const response = await fetch("http://localhost:8000/predict/mri", {
+  // CHANGED: Use 127.0.0.1 instead of localhost for Mac stability
+  const response = await fetch("http://127.0.0.1:8000/predict/mri", {
     method: "POST",
     body: formData,
   });
 
   if (!response.ok) {
     const errorText = await response.text();
-    throw new Error(
-      `MRI analysis failed (${response.status}): ${errorText}`
-    );
+    throw new Error(`MRI analysis failed (${response.status}): ${errorText}`);
   }
 
   return response.json();
