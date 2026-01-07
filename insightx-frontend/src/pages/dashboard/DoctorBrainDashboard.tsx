@@ -325,12 +325,14 @@ const DoctorBrainDashboard: React.FC = () => {
                 <div className="flex-1 flex items-center justify-center min-h-[224px]">
                   {prediction && viewMode === "heatmap" ? (
                     <HeatmapViewer
-                      imageUrl={`http://localhost:8000${prediction.heatmap_slice}`}
+                      imageUrl={`http://127.0.0.1:8000${prediction.heatmap_slice}`}
                     />
                   ) : prediction && viewMode === "volume" ? (
-                    <MRIViewer
-                      volumeUrl={`http://localhost:8000${prediction.reconstruction_file}`}
-                    />
+                    <div className="w-full h-full">
+                      <MRIViewer
+                        volumeUrl={`http://127.0.0.1:8000${prediction.reconstruction_file}`}
+                      />
+                    </div>
                   ) : (
                     <img
                       src={BrainHero}

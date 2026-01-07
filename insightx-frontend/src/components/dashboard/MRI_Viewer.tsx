@@ -1,9 +1,14 @@
 import { useLayoutEffect, useRef, useState } from "react";
-import vtkGenericRenderWindow from "vtk.js/Sources/Rendering/Misc/GenericRenderWindow";
-import vtkXMLImageDataReader from "vtk.js/Sources/IO/XML/XMLImageDataReader";
-import vtkVolume from "vtk.js/Sources/Rendering/Core/Volume";
-import vtkVolumeMapper from "vtk.js/Sources/Rendering/Core/VolumeMapper";
-import "vtk.js/Sources/Rendering/OpenGL/RenderWindow";
+import "@kitware/vtk.js/Rendering/Profiles/Volume";
+import "@kitware/vtk.js/Rendering/Profiles/Geometry";
+import vtkGenericRenderWindow from "@kitware/vtk.js/Rendering/Misc/GenericRenderWindow";
+import vtkXMLImageDataReader from "@kitware/vtk.js/IO/XML/XMLImageDataReader";
+import vtkVolume from "@kitware/vtk.js/Rendering/Core/Volume";
+import vtkVolumeMapper from "@kitware/vtk.js/Rendering/Core/VolumeMapper";
+import vtkColorTransferFunction from "@kitware/vtk.js/Rendering/Core/ColorTransferFunction";
+import vtkPiecewiseFunction from "@kitware/vtk.js/Common/DataModel/PiecewiseFunction";
+import vtkColorMaps from "@kitware/vtk.js/Rendering/Core/ColorTransferFunction/ColorMaps";
+import "@kitware/vtk.js/Rendering/OpenGL/RenderWindow";
 
 export default function MRIViewer({ volumeUrl }: { volumeUrl: string }) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -11,60 +16,72 @@ export default function MRIViewer({ volumeUrl }: { volumeUrl: string }) {
   const [loading, setLoading] = useState(true);
 
   useLayoutEffect(() => {
-    if (!volumeUrl) {
-      console.error("No volume URL provided");
-      return;
-    }
+    if (!volumeUrl) return;
 
-    // Delay until DOM is painted
     const frameId = requestAnimationFrame(() => {
-      if (!containerRef.current) {
-        console.error("Container still null, cannot attach canvas");
-        return;
-      }
-
-      if (grwRef.current) return; // prevent double init
+      if (!containerRef.current || grwRef.current) return;
 
       try {
         const grw = vtkGenericRenderWindow.newInstance();
         grw.setContainer(containerRef.current);
 
+        // Adjust initial size
         const { width, height } = containerRef.current.getBoundingClientRect();
-        const views = grw.getRenderWindow().getViews();
-        if (views.length > 0) {
-          views[0].setSize(width || 500, height || 500);
-        }
+        grw
+          .getRenderWindow()
+          .getViews()[0]
+          .setSize(width || 500, height || 500);
         grw.resize();
 
         const renderer = grw.getRenderer();
         const renderWindow = grw.getRenderWindow();
         const reader = vtkXMLImageDataReader.newInstance();
 
-        // Manual fetch debug
-        fetch(volumeUrl)
-          .then(res => res.text())
-          .then(txt => {
-            console.log("Manual fetch succeeded, first 200 chars:", txt.slice(0, 200));
-          })
-          .catch(err => console.error("Manual fetch failed:", err));
-
         reader.setUrl(volumeUrl).then(() => {
           const imageData = reader.getOutputData();
-          if (!imageData) {
-            console.error("No image data parsed from VTI");
-            return;
-          }
+          if (!imageData) return;
 
           const mapper = vtkVolumeMapper.newInstance();
           mapper.setInputData(imageData);
+          mapper.setMaximumSamplesPerRay(2000);
+          mapper.setSampleDistance(0.7);
 
           const volume = vtkVolume.newInstance();
           volume.setMapper(mapper);
 
+          // --- 3D VISUALIZATION MODULE ENHANCEMENTS ---
+          const property = volume.getProperty();
+
+          // 1. Color Map: Professional Grayscale for MRI
+          const ctfun = vtkColorTransferFunction.newInstance();
+          ctfun.applyColorMap(vtkColorMaps.getPresetByName("Grayscale"));
+          property.setRGBTransferFunction(0, ctfun);
+
+          // 2. Opacity Function: Removes "fog" and shows internal structure
+          const ofun = vtkPiecewiseFunction.newInstance();
+          ofun.removeAllPoints();
+          ofun.addPoint(0.0, 0.0); // air
+          ofun.addPoint(0.1, 0.0); // suppress noise
+          ofun.addPoint(0.2, 0.05); // soft tissue
+          ofun.addPoint(0.4, 0.25); // gray matter
+          ofun.addPoint(0.7, 0.6); // dense structures
+          property.setScalarOpacity(0, ofun);
+
+          // 3. Lighting: Adds depth and realistic shadows
+          property.setUseGradientOpacity(0, true);
+          property.setGradientOpacityMinimumValue(0, 0.0);
+          property.setGradientOpacityMaximumValue(0, 0.1);
+          property.setGradientOpacityMinimumOpacity(0, 0.0);
+          property.setGradientOpacityMaximumOpacity(0, 1.0);
+
           renderer.addVolume(volume);
           renderer.resetCamera();
-          renderWindow.render();
 
+          // Slight camera tilt for better 3D perspective
+          renderer.getActiveCamera().elevation(15);
+          renderer.getActiveCamera().azimuth(20);
+
+          renderWindow.render();
           setLoading(false);
         });
 
@@ -84,14 +101,38 @@ export default function MRIViewer({ volumeUrl }: { volumeUrl: string }) {
   }, [volumeUrl]);
 
   return (
-    <div className="relative w-full h-[600px] bg-black rounded-xl overflow-hidden">
-      <div ref={containerRef} className="w-full h-full" />
+    <div className="relative w-full h-[600px] bg-slate-950 rounded-xl overflow-hidden shadow-2xl border border-slate-800">
+      {/* HUD Overlay for Proposal Validation */}
+      <div className="absolute top-4 left-4 z-10 flex flex-col gap-1">
+        <div className="flex items-center gap-2">
+          <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+          <span className="text-white text-[11px] font-bold uppercase tracking-widest">
+            3D Visualization Engine
+          </span>
+        </div>
+        <span className="text-slate-400 text-[9px] uppercase tracking-tighter ml-4">
+          Render Mode: GPU Ray Casting (Volumetric)
+        </span>
+      </div>
+
+      <div
+        ref={containerRef}
+        className="w-full h-full cursor-grab active:cursor-grabbing"
+      />
+
       {loading && (
-        <div className="absolute inset-0 flex items-center justify-center bg-black/50 text-white">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white mb-2" />
-          <span className="ml-3">Loading 3D Volume...</span>
+        <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/80 z-20">
+          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-sky-500 mb-4" />
+          <span className="text-sky-500 text-xs font-bold uppercase tracking-[0.2em]">
+            Reconstructing 3D Space...
+          </span>
         </div>
       )}
+
+      {/* Interaction Help */}
+      <div className="absolute bottom-4 left-4 text-[9px] text-slate-500 bg-black/40 px-3 py-2 rounded-lg backdrop-blur-md">
+        Orbit: Left Click | Zoom: Right Click/Scroll | Pan: Shift + Click
+      </div>
     </div>
   );
 }

@@ -72,8 +72,9 @@ class AIReconstructionEngine:
         final_volume = ndimage.zoom(
             output_volume, 
             (target_shape[0]/128, target_shape[1]/64, target_shape[2]/64), 
-            order=2
+            order=3
         )
+        
         return final_volume
 
 # ==========================================
