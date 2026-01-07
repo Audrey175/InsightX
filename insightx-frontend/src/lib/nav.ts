@@ -18,7 +18,7 @@ export type SidebarNav = {
 export function getSidebarNav(role: Role): SidebarNav {
   const overview: SidebarSection = {
     title: "Overview",
-    items: [{ label: "Home", to: "/dashboard" }],
+    items: [{ label: "General", to: "/dashboard" }],
   };
 
   const doctorWorkspace: SidebarSection = {

@@ -11,22 +11,23 @@ import { ErrorState } from "../../components/ui/ErrorState";
 import { getLatestDoneSession, getSession } from "../../services/localScanStore";
 import { findPatientById } from "../../data/fakeDatabase";
 import { Button } from "../../components/ui/button";
+import { useAuth } from "../../context/AuthContext";
 import {
-  predictXRay,
-  type XRayPredictionResult,
-} from "../../services/predictionService";
+  uploadAndPredictScan,
+  type ScanRecord,
+} from "../../services/scanService";
 
 const DoctorHeartDashboard: React.FC = () => {
   const { patientId } = useParams<{ patientId: string }>();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+  const { user } = useAuth();
 
   const [scan, setScan] = useState<DoctorHeartScanRecord | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [xrayPreview, setXrayPreview] = useState<string | null>(null);
-  const [xrayPrediction, setXrayPrediction] =
-    useState<XRayPredictionResult | null>(null);
+  const [xrayScan, setXrayScan] = useState<ScanRecord | null>(null);
   const [xrayLoading, setXrayLoading] = useState(false);
   const [xrayError, setXrayError] = useState<string | null>(null);
 
@@ -135,11 +136,16 @@ const DoctorHeartDashboard: React.FC = () => {
     doc.save(`InsightX_Heart_Report_${scan.patientId}.pdf`);
   };
 
+  const extractError = (err: any) =>
+    err?.response?.data?.detail ??
+    err?.message ??
+    "Failed to analyze X-ray.";
+
   const handleXrayUpload = async (
     event: React.ChangeEvent<HTMLInputElement>
   ) => {
     const file = event.target.files?.[0];
-    if (!file) return;
+    if (!file || !scan) return;
 
     if (!file.type.startsWith("image/")) {
       setXrayError("X-ray predictor expects an image file.");
@@ -151,15 +157,19 @@ const DoctorHeartDashboard: React.FC = () => {
     }
 
     setXrayPreview(URL.createObjectURL(file));
-    setXrayPrediction(null);
+    setXrayScan(null);
     setXrayError(null);
     setXrayLoading(true);
 
     try {
-      const result = await predictXRay(file);
-      setXrayPrediction(result);
-    } catch {
-      setXrayError("Failed to analyze X-ray.");
+      const result = await uploadAndPredictScan(file, {
+        patientId: scan.patientId,
+        modality: "xray",
+        doctorId: user?.doctorId ?? user?.id,
+      });
+      setXrayScan(result);
+    } catch (err: any) {
+      setXrayError(extractError(err));
     } finally {
       setXrayLoading(false);
     }
@@ -304,35 +314,37 @@ const DoctorHeartDashboard: React.FC = () => {
 
               {xrayError && <p className="text-xs text-red-600">{xrayError}</p>}
 
-              {xrayPrediction && (
+              {xrayScan && (
                 <div className="bg-slate-50 rounded-xl p-3 text-xs space-y-1">
                   <p className="font-semibold text-slate-800">
                     X-ray AI Analysis
                   </p>
                   <p>
                     <span className="font-medium">File:</span>{" "}
-                    {xrayPrediction.filename}
+                    {xrayScan.original_filename ?? "Uploaded X-ray"}
                   </p>
                   <p>
                     <span className="font-medium">Prediction:</span>{" "}
                     <span
                       className={
-                        xrayPrediction.prediction.label === "PNEUMONIA"
+                        xrayScan.ai_result?.prediction?.label === "PNEUMONIA"
                           ? "text-red-600 font-semibold"
                           : "text-green-600 font-semibold"
                       }
                     >
-                      {xrayPrediction.prediction.label}
+                      {xrayScan.ai_result?.prediction?.label ?? "N/A"}
                     </span>
                   </p>
                   <p>
                     <span className="font-medium">Confidence:</span>{" "}
-                    {(xrayPrediction.prediction.confidence * 100).toFixed(1)}%
+                    {xrayScan.ai_result?.prediction?.confidence !== undefined
+                      ? `${(xrayScan.ai_result.prediction.confidence * 100).toFixed(1)}%`
+                      : "N/A"}
                   </p>
                   <p>
                     <span className="font-medium">Risk level:</span>{" "}
                     <span className="capitalize">
-                      {xrayPrediction.prediction.risk_level}
+                      {xrayScan.ai_result?.prediction?.risk_level ?? "N/A"}
                     </span>
                   </p>
                   <div>
@@ -340,28 +352,44 @@ const DoctorHeartDashboard: React.FC = () => {
                     <ul className="ml-4 list-disc text-[11px]">
                       <li>
                         NORMAL:{" "}
-                        {(
-                          xrayPrediction.prediction.probabilities.NORMAL * 100
-                        ).toFixed(1)}
+                        {xrayScan.ai_result?.prediction?.probabilities?.NORMAL !==
+                        undefined
+                          ? `${(
+                              xrayScan.ai_result.prediction.probabilities.NORMAL *
+                              100
+                            ).toFixed(1)}%`
+                          : "N/A"}
                         %
                       </li>
                       <li>
                         PNEUMONIA:{" "}
-                        {(
-                          xrayPrediction.prediction.probabilities.PNEUMONIA *
-                          100
-                        ).toFixed(1)}
+                        {xrayScan.ai_result?.prediction?.probabilities?.PNEUMONIA !==
+                        undefined
+                          ? `${(
+                              xrayScan.ai_result.prediction.probabilities.PNEUMONIA *
+                              100
+                            ).toFixed(1)}%`
+                          : "N/A"}
                         %
                       </li>
                     </ul>
                   </div>
                   <div>
                     <p className="font-medium">Model</p>
-                    <p>Architecture: {xrayPrediction.model_info.architecture}</p>
-                    <p>Version: {xrayPrediction.model_info.version}</p>
+                    <p>
+                      Architecture: {xrayScan.ai_result?.model_info?.architecture ?? "N/A"}
+                    </p>
+                    <p>Version: {xrayScan.ai_result?.model_info?.version ?? "N/A"}</p>
                   </div>
+                  {xrayScan.summary && (
+                    <p className="text-[11px] text-slate-600">
+                      Severity: {xrayScan.summary.severity} •{" "}
+                      {xrayScan.summary.recommendation}
+                    </p>
+                  )}
                   <p className="text-[10px] text-slate-500">
-                    {xrayPrediction.disclaimer}
+                    {xrayScan.ai_result?.disclaimer ??
+                      "This AI system is for research and decision support only."}
                   </p>
                 </div>
               )}

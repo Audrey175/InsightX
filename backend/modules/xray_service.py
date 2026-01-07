@@ -12,6 +12,7 @@ from backend.models.cnn_model import XRayCNN
 _DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 _MODEL: Optional[XRayCNN] = None
 _MODEL_PATH = Path(__file__).resolve().parents[1] / "models" / "xray_model.pth"
+_MODEL_EXPECTED_REL = Path("backend") / "models" / "xray_model.pth"
 
 _TRANSFORM = transforms.Compose(
     [
@@ -29,7 +30,8 @@ def _load_model() -> XRayCNN:
 
     if not _MODEL_PATH.exists() or _MODEL_PATH.stat().st_size == 0:
         raise FileNotFoundError(
-            f"X-ray model weights not found at {_MODEL_PATH}. Place xray_model.pth in backend/models."
+            "X-ray model weights not found. Place the file at "
+            f"{_MODEL_EXPECTED_REL.as_posix()}."
         )
 
     model = XRayCNN()

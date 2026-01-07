@@ -3,9 +3,12 @@ load_dotenv()
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from backend.data.scan_database import init_db
 from backend.models.chatbot import router as chatbot_router
+from backend.routes.health import router as health_router
 from backend.routes.predict import router as prediction_router
 from backend.routes.predict_xray import router as xray_router
+from backend.routes.scans import router as scans_router
 
 app = FastAPI()
 
@@ -22,6 +25,13 @@ app.add_middleware(
 app.include_router(chatbot_router)
 app.include_router(prediction_router)
 app.include_router(xray_router)
+app.include_router(scans_router)
+app.include_router(health_router)
+
+
+@app.on_event("startup")
+def startup():
+    init_db()
 
 
 @app.get("/")

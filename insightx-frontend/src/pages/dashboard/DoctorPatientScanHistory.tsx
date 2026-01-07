@@ -1,19 +1,53 @@
-import { useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import DashboardLayout from "../../layouts/DashboardLayout";
-import { listSessions, type ScanType } from "../../services/localScanStore";
 import { findPatientById } from "../../data/fakeDatabase";
+import {
+  getScans,
+  type ScanModality,
+  type ScanRecord,
+} from "../../services/scanService";
 
-type Tab = "all" | ScanType;
+type Tab = "all" | "brain" | "heart";
 
 export default function DoctorPatientScanHistory() {
   const { patientId = "" } = useParams<{ patientId: string }>();
   const [tab, setTab] = useState<Tab>("all");
+  const [scans, setScans] = useState<ScanRecord[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const patient = findPatientById(patientId);
-  const sessions = useMemo(() => listSessions(patientId), [patientId]);
 
-  const filtered = sessions.filter((s) => (tab === "all" ? true : s.type === tab));
+  useEffect(() => {
+    if (!patientId) {
+      setScans([]);
+      return;
+    }
+    const load = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const modality =
+          tab === "all" ? undefined : (tab === "brain" ? "mri" : "xray");
+        const result = await getScans({
+          patientId,
+          modality: modality as ScanModality | undefined,
+        });
+        setScans(result);
+      } catch (err: any) {
+        setError(
+          err?.response?.data?.detail ??
+            err?.message ??
+            "Unable to load scan history."
+        );
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    load();
+  }, [patientId, tab]);
 
   return (
     <DashboardLayout>
@@ -48,59 +82,72 @@ export default function DoctorPatientScanHistory() {
         </div>
 
         <div className="bg-white border rounded-2xl shadow-sm">
-          {filtered.length === 0 ? (
-            <div className="p-6 text-sm text-slate-600">No scan sessions yet.</div>
+          {loading ? (
+            <div className="p-6 text-sm text-slate-600">
+              Loading scan history...
+            </div>
+          ) : error ? (
+            <div className="p-6 text-sm text-rose-600">{error}</div>
+          ) : scans.length === 0 ? (
+            <div className="p-6 text-sm text-slate-600">No scans yet.</div>
           ) : (
             <ul className="divide-y">
-              {filtered.map((session) => (
-                <li key={session.id} className="p-4 flex flex-col gap-2">
+              {scans.map((scan) => (
+                <li key={scan.id} className="p-4 flex flex-col gap-2">
                   <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
                     <div className="flex flex-col">
                       <span className="text-sm font-semibold">
-                        {session.type.toUpperCase()} • {session.fileName ?? "Uploaded scan"}
+                        {scan.modality.toUpperCase()} •{" "}
+                        {scan.original_filename ?? "Uploaded scan"}
                       </span>
                       <span className="text-xs text-slate-500">
-                        {new Date(session.createdAt).toLocaleString()} • {session.modality ?? "Unknown"}
+                        {new Date(scan.created_at).toLocaleString()} •{" "}
+                        {scan.status}
                       </span>
-                      {session.notes && (
-                        <span className="text-xs text-slate-600 line-clamp-2">
-                          Notes: {session.notes}
+                      {scan.summary?.severity && (
+                        <span className="text-xs text-slate-600">
+                          Severity: {scan.summary.severity}
+                        </span>
+                      )}
+                      {scan.summary?.error && (
+                        <span className="text-xs text-rose-600">
+                          Error: {scan.summary.error}
+                        </span>
+                      )}
+                      {scan.ai_result?.prediction?.label && (
+                        <span className="text-xs text-slate-600">
+                          Label: {scan.ai_result.prediction.label}
+                          {scan.ai_result.prediction.confidence !== undefined
+                            ? ` (${(scan.ai_result.prediction.confidence * 100).toFixed(1)}%)`
+                            : ""}
+                        </span>
+                      )}
+                      {scan.ai_result?.tumor_detected !== undefined && (
+                        <span className="text-xs text-slate-600">
+                          Tumor detected: {scan.ai_result.tumor_detected ? "Yes" : "No"}
                         </span>
                       )}
                     </div>
                     <div className="flex items-center gap-2 text-xs">
                       <span
                         className={`px-2 py-1 rounded-full ${
-                          session.status === "done"
+                          scan.status === "predicted"
                             ? "bg-emerald-50 text-emerald-700"
-                            : session.status === "failed"
+                            : scan.status === "failed"
                             ? "bg-rose-50 text-rose-700"
                             : "bg-amber-50 text-amber-700"
                         }`}
                       >
-                        {session.status} • {session.progress}%
+                        {scan.status}
                       </span>
-                      {session.status === "done" ? (
-                        <Link
-                          to={`/dashboard/doctor/${session.type}/${session.patientId}?sessionId=${session.id}`}
-                          className="px-3 py-1 rounded-full border text-slate-700"
-                        >
-                          Open
-                        </Link>
-                      ) : session.status === "processing" || session.status === "queued" ? (
-                        <div className="flex items-center gap-2">
-                          <div className="h-2 w-24 bg-slate-100 rounded overflow-hidden">
-                            <div
-                              className="h-full bg-sky-500"
-                              style={{ width: `${session.progress}%` }}
-                            />
-                          </div>
-                        </div>
-                      ) : (
-                        session.error && (
-                          <span className="text-rose-600">{session.error}</span>
-                        )
-                      )}
+                      <Link
+                        to={`/dashboard/doctor/${
+                          scan.modality === "mri" ? "brain" : "heart"
+                        }/${scan.patient_id}`}
+                        className="px-3 py-1 rounded-full border text-slate-700"
+                      >
+                        Open
+                      </Link>
                     </div>
                   </div>
                 </li>

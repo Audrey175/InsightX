@@ -12,6 +12,7 @@ from backend.models.unet_model import UNet
 _DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 _UNET_MODEL: Optional[UNet] = None
 _UNET_WEIGHTS = Path(__file__).resolve().parents[1] / "models" / "unet_brats.pth"
+_UNET_EXPECTED_REL = Path("backend") / "models" / "unet_brats.pth"
 
 
 def _load_unet_model() -> UNet:
@@ -21,7 +22,8 @@ def _load_unet_model() -> UNet:
 
     if not _UNET_WEIGHTS.exists() or _UNET_WEIGHTS.stat().st_size == 0:
         raise FileNotFoundError(
-            f"UNet weights not found at {_UNET_WEIGHTS}. Place unet_brats.pth in backend/models."
+            "UNet weights not found. Place the file at "
+            f"{_UNET_EXPECTED_REL.as_posix()}."
         )
 
     model = UNet(in_channels=4, num_classes=3)

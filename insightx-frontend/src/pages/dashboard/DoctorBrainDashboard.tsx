@@ -11,22 +11,22 @@ import { ErrorState } from "../../components/ui/ErrorState";
 import { getLatestDoneSession, getSession } from "../../services/localScanStore";
 import { findPatientById } from "../../data/fakeDatabase";
 import { Button } from "../../components/ui/button";
+import { useAuth } from "../../context/AuthContext";
 import {
-  predictMRI,
-  type PredictionResult,
-} from "../../services/predictionService";
+  uploadAndPredictScan,
+  type ScanRecord,
+} from "../../services/scanService";
 
 const DoctorBrainDashboard: React.FC = () => {
   const { patientId } = useParams<{ patientId: string }>();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+  const { user } = useAuth();
 
   const [scan, setScan] = useState<DoctorBrainScanRecord | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [mriPrediction, setMriPrediction] = useState<PredictionResult | null>(
-    null
-  );
+  const [mriScan, setMriScan] = useState<ScanRecord | null>(null);
   const [mriLoading, setMriLoading] = useState(false);
   const [mriError, setMriError] = useState<string | null>(null);
 
@@ -126,13 +126,18 @@ const DoctorBrainDashboard: React.FC = () => {
     doc.save(`InsightX_Brain_Report_${scan.patientId}.pdf`);
   };
 
+  const extractError = (err: any) =>
+    err?.response?.data?.detail ??
+    err?.message ??
+    "Failed to analyze MRI. Please try again.";
+
   const handleMriUpload = async (
     event: React.ChangeEvent<HTMLInputElement>
   ) => {
     const file = event.target.files?.[0];
-    if (!file) return;
+    if (!file || !scan) return;
 
-    setMriPrediction(null);
+    setMriScan(null);
     setMriError(null);
 
     if (!file.name.toLowerCase().endsWith(".h5")) {
@@ -142,10 +147,14 @@ const DoctorBrainDashboard: React.FC = () => {
 
     setMriLoading(true);
     try {
-      const result = await predictMRI(file);
-      setMriPrediction(result);
-    } catch {
-      setMriError("Failed to analyze MRI. Please try again.");
+      const result = await uploadAndPredictScan(file, {
+        patientId: scan.patientId,
+        modality: "mri",
+        doctorId: user?.doctorId ?? user?.id,
+      });
+      setMriScan(result);
+    } catch (err: any) {
+      setMriError(extractError(err));
     } finally {
       setMriLoading(false);
     }
@@ -291,38 +300,51 @@ const DoctorBrainDashboard: React.FC = () => {
 
               {mriError && <p className="text-xs text-red-600">{mriError}</p>}
 
-              {mriPrediction && (
+              {mriScan && (
                 <div className="bg-slate-50 rounded-xl p-3 text-xs space-y-1">
                   <p className="font-semibold text-slate-800">
                     AI Diagnosis Result
                   </p>
                   <p>
                     <span className="font-medium">File:</span>{" "}
-                    {mriPrediction.filename}
+                    {mriScan.original_filename ?? "Uploaded MRI"}
                   </p>
                   <p>
                     <span className="font-medium">Tumor detected:</span>{" "}
-                    {mriPrediction.tumor_detected ? "Yes" : "No"}
+                    {mriScan.ai_result?.tumor_detected ? "Yes" : "No"}
                   </p>
                   <p>
                     <span className="font-medium">Risk score:</span>{" "}
-                    {(mriPrediction.risk_score * 100).toFixed(1)}%
+                    {mriScan.ai_result?.risk_score !== undefined
+                      ? `${(mriScan.ai_result.risk_score * 100).toFixed(1)}%`
+                      : "N/A"}
                   </p>
                   <div>
                     <p className="font-medium">Tumor size (pixels)</p>
                     <ul className="ml-4 list-disc text-[11px]">
-                      <li>Core: {mriPrediction.tumor_size_pixels.core}</li>
                       <li>
-                        Enhancing: {mriPrediction.tumor_size_pixels.enhancing}
+                        Core: {mriScan.ai_result?.tumor_size_pixels?.core ?? "N/A"}
                       </li>
-                      <li>Whole: {mriPrediction.tumor_size_pixels.whole}</li>
+                      <li>
+                        Enhancing:{" "}
+                        {mriScan.ai_result?.tumor_size_pixels?.enhancing ?? "N/A"}
+                      </li>
+                      <li>
+                        Whole: {mriScan.ai_result?.tumor_size_pixels?.whole ?? "N/A"}
+                      </li>
                     </ul>
                   </div>
-                  {mriPrediction.tumor_location && (
+                  {mriScan.ai_result?.tumor_location && (
                     <p>
                       <span className="font-medium">Location:</span> x=
-                      {mriPrediction.tumor_location.x.toFixed(1)}, y=
-                      {mriPrediction.tumor_location.y.toFixed(1)}
+                      {mriScan.ai_result.tumor_location.x.toFixed(1)}, y=
+                      {mriScan.ai_result.tumor_location.y.toFixed(1)}
+                    </p>
+                  )}
+                  {mriScan.summary && (
+                    <p>
+                      <span className="font-medium">Severity:</span>{" "}
+                      {mriScan.summary.severity} • {mriScan.summary.recommendation}
                     </p>
                   )}
                 </div>
