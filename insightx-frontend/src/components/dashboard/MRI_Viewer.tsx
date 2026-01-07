@@ -60,19 +60,19 @@ export default function MRIViewer({ volumeUrl }: { volumeUrl: string }) {
           // 2. Opacity Function: Removes "fog" and shows internal structure
           const ofun = vtkPiecewiseFunction.newInstance();
           ofun.removeAllPoints();
-          ofun.addPoint(0.0, 0.0); // air
-          ofun.addPoint(0.1, 0.0); // suppress noise
-          ofun.addPoint(0.2, 0.05); // soft tissue
-          ofun.addPoint(0.4, 0.25); // gray matter
-          ofun.addPoint(0.7, 0.6); // dense structures
+          ofun.addPoint(0, 0.0);    // 100% transparent for air/noise
+          ofun.addPoint(0.15, 0.0); // HARD CUTOFF: Removes the "foggy box" edges
+          ofun.addPoint(0.25, 0.1); // Soft tissue (starts becoming visible)
+          ofun.addPoint(0.4, 0.6);  // Brain surface (sharp increase)
+          ofun.addPoint(1.0, 0.9);  // Internal dense structures
           property.setScalarOpacity(0, ofun);
-
           // 3. Lighting: Adds depth and realistic shadows
           property.setUseGradientOpacity(0, true);
           property.setGradientOpacityMinimumValue(0, 0.0);
           property.setGradientOpacityMaximumValue(0, 0.1);
           property.setGradientOpacityMinimumOpacity(0, 0.0);
           property.setGradientOpacityMaximumOpacity(0, 1.0);
+          property.setShade(true);    
 
           renderer.addVolume(volume);
           renderer.resetCamera();

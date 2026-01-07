@@ -43,7 +43,7 @@ class UNet3DReconstructor(nn.Module):
 # ==========================================
 class AIReconstructionEngine:
     def __init__(self):
-        self.device = torch.device("cpu") # Optimized for Mac CPU
+        self.device = torch.device("cpu") 
         self.model = UNet3DReconstructor().to(self.device)
         self.model.eval()
 
@@ -53,13 +53,12 @@ class AIReconstructionEngine:
         """
         # Downsample for performance to avoid timeouts
         d, h, w = volume.shape
-        resampled = ndimage.zoom(volume, (128/d, 64/h, 64/w), order=1)
+        resampled = ndimage.zoom(volume, (128/d, 128/h, 128/w), order=1)
         
         # Prepare 5D Tensor: (Batch, Channel, Depth, Height, Width)
         tensor_in = torch.from_numpy(resampled).float().unsqueeze(0).unsqueeze(0).to(self.device)
 
         # Generate Grad-CAM Heatmap via the specialized module
-        # This function hooks the model and saves the heatmap.png
         reconstructed_tensor = generate_grad_cam_heatmap(
             self.model, 
             tensor_in, 
@@ -71,9 +70,10 @@ class AIReconstructionEngine:
         output_volume = reconstructed_tensor.squeeze().detach().cpu().numpy()
         final_volume = ndimage.zoom(
             output_volume, 
-            (target_shape[0]/128, target_shape[1]/64, target_shape[2]/64), 
+            (target_shape[0]/128, target_shape[1]/128, target_shape[2]/128), 
             order=3
         )
+        final_volume[final_volume < 0.15] = 0
         
         return final_volume
 
@@ -237,11 +237,10 @@ def analyze_dicom_zip(zip_path: str):
         save_h5(volume, spacing, series_uid, h5_path)
 
         # 5. Execute AI Reconstruction Engine (3D U-Net + Grad-CAM)
-        # We target 256 depth for high-quality VTK rendering
         engine = AIReconstructionEngine()
         ai_volume = engine.analyze_volume(
             volume, 
-            target_shape=(256, 128, 128), 
+            target_shape=(128, 128, 128), 
             heatmap_path=heatmap_path
         )
 
