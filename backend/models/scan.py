@@ -1,5 +1,5 @@
-from sqlalchemy import Column, Integer, String, Text
-
+from sqlalchemy import Column, Integer, String, Text, DateTime
+from sqlalchemy.sql import func
 from backend.data.scan_database import Base
 
 
@@ -16,3 +16,9 @@ class Scan(Base):
     ai_result_json = Column(Text, nullable=True)
     summary_json = Column(Text, nullable=True)
     original_filename = Column(String, nullable=True)
+    scan_type = Column(String, default="MRI") # e.g., MRI, CT, X-Ray
+    status = Column(String, default="processing") # e.g., processing, completed
+    risk_level = Column(String, default="Low") # e.g., High, Medium, Low
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    result = Column(Text, nullable=True)
