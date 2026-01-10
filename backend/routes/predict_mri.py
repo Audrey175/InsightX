@@ -153,7 +153,7 @@ async def predict_mri(file: UploadFile = File(...)):
         ai_results = run_ai_analysis(static_path)
 
         # 4. Merge results
-        return {**mri_data, "ai_analysis": ai_results}
+        return {**mri_data,  **ai_results}
 
     finally:
         if os.path.exists(zip_path):

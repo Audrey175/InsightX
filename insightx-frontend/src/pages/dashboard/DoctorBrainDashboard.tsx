@@ -290,55 +290,65 @@ const DoctorBrainDashboard: React.FC = () => {
                 </div>
 
                 {mriLoading && (
-                  <p className="text-sky-600 text-xs animate-pulse">
-                    Processing high-fidelity reconstruction...
+                  <p className="text-sky-600 text-xs animate-pulse font-bold">
+                    RECONSTRUCTING VOLUMETRIC SPACE...
                   </p>
                 )}
-                {mriError && <p className="text-red-500 text-xs">{mriError}</p>}
+                {mriError && (
+                  <p className="text-red-500 text-xs font-bold uppercase">
+                    {mriError}
+                  </p>
+                )}
 
                 {prediction ? (
-                  <div className="grid grid-cols-2 gap-x-8 gap-y-3 text-xs border-t pt-4">
-                    <div className="space-y-2">
-                      <p>
-                        <span className="text-slate-400">
-                          Reconstruction Engine:
-                        </span>{" "}
-                        <span className="font-medium">
-                          {prediction.reconstruction_engine || "3D U-Net"}
-                        </span>
-                      </p>
-                      <p>
-                        <span className="text-slate-400">
-                          Volume Resolution:
-                        </span>{" "}
-                        <span className="font-medium">
-                          {prediction.volume_shape?.depth}px Z-Axis
-                        </span>
-                      </p>
-                    </div>
-                    <div className="space-y-2">
-                      <p>
-                        <span className="text-slate-400">Classification:</span>{" "}
-                        <span className="text-blue-700 font-bold uppercase">
-                          {prediction.ai_analysis?.classification?.tumor_type ||
-                            "No Malignancy Detected"}
-                        </span>
-                      </p>
-                      <p>
-                        <span className="text-slate-400">AI Confidence:</span>{" "}
-                        <span className="font-medium">
-                          {(
-                            prediction.ai_analysis?.classification?.confidence *
-                            100
-                          ).toFixed(1)}
-                          %
-                        </span>
-                      </p>
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-2 gap-x-8 gap-y-3 text-xs border-t pt-4">
+                      <div className="space-y-2">
+                        <p>
+                          <span className="text-slate-400">Diagnosis:</span>{" "}
+                          <span className="text-blue-700 font-bold uppercase">
+                            {prediction.classification.tumor_type}
+                          </span>
+                        </p>
+                        <p>
+                          <span className="text-slate-400">Confidence:</span>{" "}
+                          <span className="font-bold text-slate-900">
+                            {(
+                              prediction.classification.confidence * 100
+                            ).toFixed(1)}
+                            %
+                          </span>
+                        </p>
+                      </div>
+                      <div className="space-y-2">
+                        <p>
+                          <span className="text-slate-400">
+                            Tumor Detected:
+                          </span>{" "}
+                          <span
+                            className={`font-bold ${
+                              prediction.segmentation.tumor_detected
+                                ? "text-red-500"
+                                : "text-emerald-500"
+                            }`}
+                          >
+                            {prediction.segmentation.tumor_detected
+                              ? "YES"
+                              : "NO"}
+                          </span>
+                        </p>
+                        <p>
+                          <span className="text-slate-400">Volume:</span>{" "}
+                          <span className="font-bold">
+                            {prediction.segmentation.tumor_size_pixels}px³
+                          </span>
+                        </p>
+                      </div>
                     </div>
                   </div>
                 ) : (
                   <div className="py-6 text-center border-2 border-dashed border-slate-100 rounded-xl">
-                    <p className="text-slate-400 text-xs italic">
+                    <p className="text-slate-400 text-xs italic font-medium">
                       Upload DICOM .zip to initiate 3D reconstruction
                     </p>
                   </div>
@@ -437,6 +447,46 @@ const DoctorBrainDashboard: React.FC = () => {
                 </div>
               </div>
 
+              {prediction && (
+                <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200 animate-in fade-in slide-in-from-right-4 duration-500">
+                  <h2 className="text-xs font-bold text-slate-800 uppercase mb-4 tracking-wider">
+                    Pathology Probabilities
+                  </h2>
+                  <div className="space-y-3">
+                    {Object.entries(
+                      prediction.classification.probabilities
+                    ).map(([key, value]) => (
+                      <div key={key} className="space-y-1">
+                        <div className="flex justify-between text-[10px] font-bold uppercase">
+                          <span
+                            className={
+                              prediction.classification.tumor_type === key
+                                ? "text-sky-600"
+                                : "text-slate-400"
+                            }
+                          >
+                            {key}
+                          </span>
+                          <span className="text-slate-900">
+                            {(value * 100).toFixed(1)}%
+                          </span>
+                        </div>
+                        <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                          <div
+                            className={`h-full transition-all duration-1000 ${
+                              prediction.classification.tumor_type === key
+                                ? "bg-sky-500"
+                                : "bg-slate-300"
+                            }`}
+                            style={{ width: `${value * 100}%` }}
+                          />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200">
                 <h2 className="text-xs font-bold text-slate-800 uppercase mb-4 tracking-wider">
                   Clinical Observations
@@ -456,12 +506,17 @@ const DoctorBrainDashboard: React.FC = () => {
                       {scan?.injury.type}
                     </span>
                   </div>
+
                   <div className="pt-2">
                     <p className="text-[10px] font-bold text-slate-400 uppercase mb-2">
                       Flagged Risks
                     </p>
                     <ul className="space-y-2">
-                      {scan?.risks.map((r, i) => (
+                      {(
+                        prediction?.risk_analysis?.risks ||
+                        scan?.risks ||
+                        []
+                      ).map((r, i) => (
                         <li
                           key={i}
                           className="text-xs text-slate-700 flex gap-2"

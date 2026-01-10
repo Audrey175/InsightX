@@ -1,6 +1,16 @@
 export interface MRIPredictionResult {
   modality: string;
   reconstruction_engine: string; 
+  filename: string;
+  segmentation: {
+    tumor_detected: boolean;
+    tumor_size_pixels: number;
+    tumor_location: {
+      x: number;
+      y: number;
+    } | null;
+    
+  };
   series_uid: string;
   series_detected: number;
   volume_shape: { depth: number; height: number; width: number };
@@ -12,10 +22,20 @@ export interface MRIPredictionResult {
     mean_intensity: number; 
     max_intensity: number; 
   };
-  ai_analysis?: {
-    classification: { tumor_type: string; confidence: number };
-    risk_analysis: { risks: string[] };
+   classification: {
+    tumor_type: "glioma" | "meningioma" | "notumor" | "pituitary";
+    confidence: number;
+    probabilities: {
+      glioma: number;
+      meningioma: number;
+      notumor: number;
+      pituitary: number;
+    }
   };
+  risk_analysis: {
+    risks: string[];
+  };
+
   disclaimer: string;
 }
 
@@ -36,3 +56,4 @@ export async function predictMRI(file: File): Promise<MRIPredictionResult> {
 
   return response.json();
 }
+
