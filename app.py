@@ -9,7 +9,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from backend.data.scan_database import init_db
 from backend.routes import dashboard, scans, patient_router 
 from backend.models.chatbot import router as chatbot_router
-from backend.routes.predict import router as prediction_router
 from backend.routes.predict_xray import router as xray_router  
 from backend.routes.predict_mri import router as mri_router
 
@@ -28,7 +27,6 @@ app.add_middleware(
 )
 
 # 2. Routers (Included only once)
-app.include_router(prediction_router, tags=["General Prediction"])
 app.include_router(xray_router, tags=["X-Ray"])
 app.include_router(mri_router, tags=["MRI"])
 app.include_router(chatbot_router, prefix="/chat", tags=["Chatbot"])

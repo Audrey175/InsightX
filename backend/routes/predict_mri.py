@@ -142,11 +142,9 @@ async def predict_mri(file: UploadFile = File(...)):
 
     try:
         # 2. Process DICOM -> VTI & Heatmap PNG
-        # analyze_dicom_zip handles extraction and 3D reconstruction
         mri_data = analyze_dicom_zip(zip_path)
 
         # 3. Run AI analysis on the generated heatmap slice
-        # The heatmap_slice path is absolute/relative from static, adjust accordingly
         heatmap_url_path = mri_data["heatmap_slice"]
         relative_file_path = heatmap_url_path.replace("/static", "backend/static", 1).lstrip("/")
         static_path = os.path.join(os.getcwd(), relative_file_path)

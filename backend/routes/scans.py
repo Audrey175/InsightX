@@ -12,7 +12,6 @@ from sqlalchemy.orm import Session
 
 from backend.data.scan_database import get_db
 from backend.models.scan import Scan
-from backend.modules.prediction_service import analyze_mri
 from backend.modules.xray_service import analyze_xray
 
 router = APIRouter(prefix="/scans", tags=["Scans"])
