@@ -22,25 +22,16 @@ import ProtectedRoute from "./components/routing/ProtectedRoute";
 import RequireGuest from "./components/routing/RequireGuest";
 import RoleHomeRedirect from "./components/routing/RoleHomeRedirect";
 import { useAuth } from "./context/AuthContext";
-import { getRoleHomePath } from "./lib/paths";
+
 import DoctorProfilePage from "./pages/profile/DoctorProfilePage";
 import PatientProfilePage from "./pages/profile/PatientProfilePage";
 import AssistantChatPage from "./pages/assistant/AssistantChatPage";
+
 import SettingsLayout from "./pages/settings/SettingsLayout";
 import AccountSettings from "./pages/settings/AccountSettings";
 import SystemSettings from "./pages/settings/SystemSettings";
 import NotificationSettings from "./pages/settings/NotificationSettings";
 import OtherSettings from "./pages/settings/OtherSettings";
-
-function DashboardEntry() {
-  const { user } = useAuth();
-  if (!user) return <Navigate to="/" replace />;
-
-  if (user.role === "doctor" || user.role === "patient") {
-    return <Navigate to={getRoleHomePath(user.role)} replace />;
-  }
-  return <GeneralDashboard />;
-}
 
 export default function App() {
   const { user } = useAuth();
@@ -75,8 +66,22 @@ export default function App() {
         }
       />
 
-      {/* Dashboard entry */}
-      <Route path="/dashboard" element={<DashboardEntry />} />
+      {/* Dashboard redirect -> General Dashboard */}
+      <Route path="/dashboard" element={<Navigate to="/dashboard/general" replace />} />
+
+      {/* Authenticated shared routes (any logged-in role) */}
+      <Route element={<ProtectedRoute />}>
+        <Route path="/dashboard/general" element={<GeneralDashboard />} />
+        <Route path="/assistant" element={<AssistantChatPage />} />
+
+        <Route path="/settings" element={<Navigate to="/settings/account" replace />} />
+        <Route path="/settings" element={<SettingsLayout />}>
+          <Route path="account" element={<AccountSettings />} />
+          <Route path="system" element={<SystemSettings />} />
+          <Route path="notifications" element={<NotificationSettings />} />
+          <Route path="other" element={<OtherSettings />} />
+        </Route>
+      </Route>
 
       {/* Doctor-only routes */}
       <Route element={<ProtectedRoute allowedRoles={["doctor"]} />}>
@@ -110,14 +115,8 @@ export default function App() {
       <Route element={<ProtectedRoute allowedRoles={["patient"]} />}>
         <Route path="/dashboard/patient/scans" element={<PatientScansOverview />} />
         <Route path="/dashboard/patient/history" element={<PatientScanHistory />} />
-        <Route
-          path="/dashboard/patient/brain"
-          element={<PatientBrainDashboard />}
-        />
-        <Route
-          path="/dashboard/patient/heart"
-          element={<PatientHeartDashboard />}
-        />
+        <Route path="/dashboard/patient/brain" element={<PatientBrainDashboard />} />
+        <Route path="/dashboard/patient/heart" element={<PatientHeartDashboard />} />
         <Route path="/profile/patient" element={<PatientProfilePage />} />
       </Route>
 
@@ -131,7 +130,7 @@ export default function App() {
                   ? "/profile/doctor"
                   : user.role === "patient"
                   ? "/profile/patient"
-                  : "/dashboard"
+                  : "/dashboard/general"
               }
               replace
             />
@@ -140,19 +139,6 @@ export default function App() {
           )
         }
       />
-
-      {/* Authenticated shared routes */}
-      <Route element={<ProtectedRoute />}>
-        <Route path="/assistant" element={<AssistantChatPage />} />
-
-        <Route path="/settings" element={<Navigate to="/settings/account" replace />} />
-        <Route path="/settings" element={<SettingsLayout />}>
-          <Route path="account" element={<AccountSettings />} />
-          <Route path="system" element={<SystemSettings />} />
-          <Route path="notifications" element={<NotificationSettings />} />
-          <Route path="other" element={<OtherSettings />} />
-        </Route>
-      </Route>
 
       {/* 404 */}
       <Route

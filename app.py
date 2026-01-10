@@ -4,11 +4,15 @@ from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 
+
 # Import Routers
+from backend.data.scan_database import init_db
+from backend.routes import dashboard, scans, patient_router 
 from backend.models.chatbot import router as chatbot_router
 from backend.routes.predict import router as prediction_router
-from backend.routes.predict_xray import router as xray_router  # Renamed for clarity
+from backend.routes.predict_xray import router as xray_router  
 from backend.routes.predict_mri import router as mri_router
+
 
 load_dotenv()
 
@@ -28,6 +32,9 @@ app.include_router(prediction_router, tags=["General Prediction"])
 app.include_router(xray_router, tags=["X-Ray"])
 app.include_router(mri_router, tags=["MRI"])
 app.include_router(chatbot_router, prefix="/chat", tags=["Chatbot"])
+app.include_router(dashboard.router, prefix="/api/dashboard", tags=["Dashboard"])
+app.include_router(scans.router, prefix="/api/scans", tags=["Scans"])
+app.include_router(patient_router.router, prefix="/api/patients", tags=["Patients"])
 
 # 3. Static Files (One mount per directory)
 # Consolidating heatmaps/outputs to one mount point
@@ -37,3 +44,7 @@ app.mount("/outputs", StaticFiles(directory="backend/static/reconstructions"), n
 @app.get("/")
 async def root():
     return {"message": "InsightX Server is running."}
+
+@app.on_event("startup")
+def startup(): 
+    init_db()

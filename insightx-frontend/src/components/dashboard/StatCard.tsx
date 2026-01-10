@@ -1,42 +1,42 @@
-import React from "react";
+import React from 'react';
+// FIXED: Use 'import type' for LucideIcon
+import type { LucideIcon } from 'lucide-react'; 
 
-type Props = {
+interface StatCardProps {
   title: string;
-  value: string | number;
-  change?: string;
-  changeType?: "up" | "down";
-  children?: React.ReactNode; // for mini chart or icon
-};
+  value: string;
+  icon: LucideIcon;
+  trend: string;
+  trendUp: boolean;
+}
 
-const StatCard: React.FC<Props> = ({
-  title,
-  value,
-  change,
-  changeType = "up",
-  children,
+const StatCard: React.FC<StatCardProps> = ({ 
+  title, 
+  value, 
+  icon: Icon, 
+  trend, 
+  trendUp 
 }) => {
-  const changeColor =
-    changeType === "up" ? "text-emerald-600" : "text-rose-600";
-  const badgeColor =
-    changeType === "up" ? "bg-emerald-50" : "bg-rose-50";
-
   return (
-    <div className="bg-white rounded-xl border border-slate-100 shadow-sm p-4 flex flex-col gap-3">
-      <div className="text-xs font-medium text-slate-500">{title}</div>
-      <div className="flex items-end justify-between gap-2">
+    <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+      <div className="flex justify-between items-start">
         <div>
-          <div className="text-2xl font-semibold text-slate-900">
-            {value}
-          </div>
-          {change && (
-            <span
-              className={`inline-flex mt-1 items-center rounded-full px-2 py-0.5 text-[11px] font-medium ${badgeColor} ${changeColor}`}
-            >
-              {change}
-            </span>
-          )}
+          <p className="text-sm font-medium text-gray-500">{title}</p>
+          <h3 className="text-2xl font-bold text-gray-900 mt-2">{value}</h3>
         </div>
-        {children && <div className="h-10 w-20">{children}</div>}
+        <div className="p-2 bg-blue-50 text-blue-600 rounded-lg">
+          <Icon className="w-5 h-5" />
+        </div>
+      </div>
+      <div className="mt-4 flex items-center">
+        <span 
+          className={`text-sm font-medium ${
+            trendUp ? 'text-green-600' : 'text-red-600'
+          }`}
+        >
+          {trend}
+        </span>
+        <span className="text-sm text-gray-400 ml-2">vs last month</span>
       </div>
     </div>
   );
