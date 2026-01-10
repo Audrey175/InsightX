@@ -22,19 +22,31 @@ export default function MRIViewer({ volumeUrl }: { volumeUrl: string }) {
       if (!containerRef.current || grwRef.current) return;
 
       try {
-        const grw = vtkGenericRenderWindow.newInstance();
+        const grw = vtkGenericRenderWindow.newInstance({
+          listenWindowResize: true,
+          background: [0, 0, 0],
+        });
+
         grw.setContainer(containerRef.current);
+
+        // --- FIX: PROPERLY SET PRESERVE DRAWING BUFFER ---
+        const apiRW = grw.getApiSpecificRenderWindow();
+        // We use 'set' on the internal OpenGL object to ensure the buffer isn't cleared
+        if (apiRW && (apiRW as any).setPreserveDrawingBuffer) {
+          (apiRW as any).setPreserveDrawingBuffer(true);
+        }
+
+        const renderWindow = grw.getRenderWindow();
+        const renderer = grw.getRenderer();
+
+        // Attach to window so the PDF exporter can force a render
+        (window as any).vtkRenderWindow = renderWindow;
 
         // Adjust initial size
         const { width, height } = containerRef.current.getBoundingClientRect();
-        grw
-          .getRenderWindow()
-          .getViews()[0]
-          .setSize(width || 500, height || 500);
+        renderWindow.getViews()[0].setSize(width || 500, height || 500);
         grw.resize();
 
-        const renderer = grw.getRenderer();
-        const renderWindow = grw.getRenderWindow();
         const reader = vtkXMLImageDataReader.newInstance();
 
         reader.setUrl(volumeUrl).then(() => {
@@ -49,40 +61,43 @@ export default function MRIViewer({ volumeUrl }: { volumeUrl: string }) {
           const volume = vtkVolume.newInstance();
           volume.setMapper(mapper);
 
-          // --- 3D VISUALIZATION MODULE ENHANCEMENTS ---
+          // --- 3D VISUALIZATION ENHANCEMENTS ---
           const property = volume.getProperty();
 
-          // 1. Color Map: Professional Grayscale for MRI
           const ctfun = vtkColorTransferFunction.newInstance();
           ctfun.applyColorMap(vtkColorMaps.getPresetByName("Grayscale"));
           property.setRGBTransferFunction(0, ctfun);
 
-          // 2. Opacity Function: Removes "fog" and shows internal structure
           const ofun = vtkPiecewiseFunction.newInstance();
           ofun.removeAllPoints();
-          ofun.addPoint(0, 0.0);    // 100% transparent for air/noise
-          ofun.addPoint(0.15, 0.0); // HARD CUTOFF: Removes the "foggy box" edges
-          ofun.addPoint(0.25, 0.1); // Soft tissue (starts becoming visible)
-          ofun.addPoint(0.4, 0.6);  // Brain surface (sharp increase)
-          ofun.addPoint(1.0, 0.9);  // Internal dense structures
+          ofun.addPoint(0, 0.0);
+          ofun.addPoint(0.15, 0.0);
+          ofun.addPoint(0.25, 0.1);
+          ofun.addPoint(0.4, 0.6);
+          ofun.addPoint(1.0, 0.9);
           property.setScalarOpacity(0, ofun);
-          // 3. Lighting: Adds depth and realistic shadows
+
           property.setUseGradientOpacity(0, true);
           property.setGradientOpacityMinimumValue(0, 0.0);
           property.setGradientOpacityMaximumValue(0, 0.1);
           property.setGradientOpacityMinimumOpacity(0, 0.0);
           property.setGradientOpacityMaximumOpacity(0, 1.0);
-          property.setShade(true);    
+          property.setShade(true);
 
           renderer.addVolume(volume);
           renderer.resetCamera();
 
-          // Slight camera tilt for better 3D perspective
           renderer.getActiveCamera().elevation(15);
           renderer.getActiveCamera().azimuth(20);
 
           renderWindow.render();
           setLoading(false);
+          (window as any).getVTKSnapshot = () => {
+            const apiRW = grw.getApiSpecificRenderWindow();
+            // Force a fresh render to ensure buffer is full
+            renderWindow.render();
+            return apiRW.getCanvas().toDataURL("image/png");
+          };
         });
 
         grwRef.current = grw;
@@ -102,7 +117,6 @@ export default function MRIViewer({ volumeUrl }: { volumeUrl: string }) {
 
   return (
     <div className="relative w-full h-[600px] bg-slate-950 rounded-xl overflow-hidden shadow-2xl border border-slate-800">
-      {/* HUD Overlay for Proposal Validation */}
       <div className="absolute top-4 left-4 z-10 flex flex-col gap-1">
         <div className="flex items-center gap-2">
           <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
@@ -129,7 +143,6 @@ export default function MRIViewer({ volumeUrl }: { volumeUrl: string }) {
         </div>
       )}
 
-      {/* Interaction Help */}
       <div className="absolute bottom-4 left-4 text-[9px] text-slate-500 bg-black/40 px-3 py-2 rounded-lg backdrop-blur-md">
         Orbit: Left Click | Zoom: Right Click/Scroll | Pan: Shift + Click
       </div>

@@ -4,10 +4,10 @@ export interface MRIPredictionResult {
   series_uid: string;
   series_detected: number;
   volume_shape: { depth: number; height: number; width: number };
-  voxel_spacing: [number, number, number]; // Better to define as a fixed triple
+  voxel_spacing: [number, number, number];
   reconstruction_file: string; // The .vti file
   heatmap_slice: string;       // The Grad-CAM .png
-  canonical_volume_file: string; // ADDED: The .h5 file for your teammate
+  canonical_volume_file: string;
   statistics: { 
     mean_intensity: number; 
     max_intensity: number; 
