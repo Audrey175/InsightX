@@ -1,81 +1,201 @@
-import sys
 import os
+import random
+import sys
+from datetime import date, datetime, timedelta
 
 sys.path.append(os.getcwd())
 
 from backend.data.scan_database import SessionLocal, init_db
+from backend.models.doctor import Doctor
 from backend.models.patient import Patient
 from backend.models.scan import Scan
-from datetime import date, datetime, timedelta
-import random
 
-try:
-    print("Initializing database...")
+# ✅ NEW: user auth model + password hashing
+from backend.models.user import User
+from backend.auth.security import hash_password
+
+
+DEFAULT_DOCTOR_PASSWORD = os.getenv("SEED_DOCTOR_PASSWORD", "InsightX@123")
+DEFAULT_PATIENT_PASSWORD = os.getenv("SEED_PATIENT_PASSWORD", "Patient@123")
+
+
+def seed() -> None:
     init_db()
     db = SessionLocal()
-    print("Database connection successful.")
-except Exception as e:
-    print(f"Error connecting to database: {e}")
-    sys.exit(1)
+    try:
+        # If data exists, skip
+        if db.query(Doctor).first():
+            print("Seed data already present; skipping.")
+            return
 
-print("Seeding data...")
+        # -----------------------------
+        # 1) Seed Doctors
+        # -----------------------------
+        doctors = [
+            Doctor(
+                full_name="Dr. Amina Patel",
+                specialization="Radiology",
+                email="amina.patel@insightx.dev",
+            ),
+            Doctor(
+                full_name="Dr. Luis Romero",
+                specialization="Neurology",
+                email="luis.romero@insightx.dev",
+            ),
+            Doctor(
+                full_name="Dr. Chloe Martin",
+                specialization="Cardiology",
+                email="chloe.martin@insightx.dev",
+            ),
+            Doctor(
+                full_name="Dr. Ethan Brooks",
+                specialization="Oncology",
+                email="ethan.brooks@insightx.dev",
+            ),
+        ]
+        db.add_all(doctors)
+        db.commit()
+        for doctor in doctors:
+            db.refresh(doctor)
 
-try:
-    # 1. Create Dummy Patients
-    patients = [
-        Patient(first_name="John", last_name="Doe", dob=date(1980, 1, 1), gender="Male", contact_number="1234567890"),
-        Patient(first_name="Jane", last_name="Smith", dob=date(1992, 5, 15), gender="Female", contact_number="0987654321"),
-        Patient(first_name="Robert", last_name="Johnson", dob=date(1975, 11, 30), gender="Male", contact_number="1122334455"),
-        Patient(first_name="Emily", last_name="Davis", dob=date(1988, 3, 22), gender="Female", contact_number="5566778899"),
-        Patient(first_name="Michael", last_name="Brown", dob=date(1960, 8, 10), gender="Male", contact_number="6677889900"),
-    ]
+        # -----------------------------
+        # 2) Seed Patients
+        # -----------------------------
+        first_names = [
+            "John",
+            "Jane",
+            "Robert",
+            "Emily",
+            "Michael",
+            "Sara",
+            "David",
+            "Mia",
+            "James",
+            "Olivia",
+            "Noah",
+            "Sophia",
+        ]
+        last_names = [
+            "Doe",
+            "Smith",
+            "Johnson",
+            "Davis",
+            "Brown",
+            "Wilson",
+            "Taylor",
+            "Anderson",
+            "Thomas",
+            "Moore",
+            "Martin",
+            "Lee",
+        ]
+        genders = ["Male", "Female", "Non-binary"]
 
-    # Add patients
-    for p in patients:
-        db.add(p)
-    db.commit()
+        patients: list[Patient] = []
+        for idx in range(12):
+            first_name = first_names[idx]
+            last_name = last_names[idx]
+            age = random.randint(18, 80)
+            dob = date.today() - timedelta(days=age * 365)
+            doctor = random.choice(doctors)
 
-    # Refresh to get IDs
-    for p in patients:
-        db.refresh(p)
+            patients.append(
+                Patient(
+                    full_name=f"{first_name} {last_name}",
+                    first_name=first_name,
+                    last_name=last_name,
+                    age=age,
+                    dob=dob,
+                    gender=random.choice(genders),
+                    medical_history="Routine monitoring",
+                    contact_number=f"555-010{idx:02d}",
+                    address="123 InsightX Ave",
+                    doctor_id=doctor.id,
+                )
+            )
 
-    print(f"✅ Added {len(patients)} patients.")
+        db.add_all(patients)
+        db.commit()
+        for patient in patients:
+            db.refresh(patient)
 
-    # 2. Create Dummy Scans
-    scan_types = ["MRI", "CT", "X-Ray"]
-    statuses = ["processing", "completed", "failed"]
-    risks = ["Low", "Medium", "High"]
+        # -----------------------------
+        # 3) Seed Scans
+        # -----------------------------
+        modalities = ["mri", "xray", "ct", "general"]
+        statuses = ["processing", "completed", "failed", "uploaded"]
+        risks = ["Low", "Medium", "High"]
 
-    scans = []
-    for i in range(15): 
-        patient = random.choice(patients)
-        random_days = random.randint(0, 30)
-        scan_date = datetime.now() - timedelta(days=random_days)
-        chosen_type = random.choice(scan_types)
+        scans: list[Scan] = []
+        for i in range(24):
+            patient = random.choice(patients)
+            scan_date = datetime.utcnow() - timedelta(days=random.randint(0, 45))
+            modality = random.choice(modalities)
 
-        scan = Scan(
-            patient_id=patient.id,
-            # Required Database Fields:
-            modality=chosen_type,
-            file_path=f"dummy_uploads/scan_{i}.jpg",  
-            original_filename=f"patient_{patient.id}_scan.jpg", 
-            
-            # Dashboard Fields:
-            scan_type=chosen_type,
-            status=random.choice(statuses),
-            risk_level=random.choice(risks),
-            created_at=scan_date,
-            result=f"Routine checkup result for {patient.first_name}"
+            scans.append(
+                Scan(
+                    patient_id=patient.id,
+                    doctor_id=patient.doctor_id,
+                    modality=modality,
+                    file_path=f"uploads/seed/scan_{i}.dcm",
+                    original_filename=f"patient_{patient.id}_{modality}_{i}.dcm",
+                    status=random.choice(statuses),
+                    risk_level=random.choice(risks),
+                    created_at=scan_date,
+                    result=f"Routine {modality.upper()} scan.",
+                )
+            )
+
+        db.add_all(scans)
+        db.commit()
+
+        # -----------------------------
+        # 4) Seed AUTH Users (PERMANENT LOGIN)
+        # -----------------------------
+        users: list[User] = []
+
+        # Doctor accounts (login by seeded doctor email)
+        for d in doctors:
+            users.append(
+                User(
+                    email=d.email.lower(),
+                    password_hash=hash_password(DEFAULT_DOCTOR_PASSWORD),
+                    role="doctor",
+                    full_name=d.full_name,
+                    doctor_id=d.id,
+                    patient_id=None,
+                )
+            )
+
+        # Optional: Patient accounts (login as patient)
+        # If you don’t want patient login, you can delete this block.
+        for p in patients:
+            patient_email = f"patient{p.id}@insightx.dev"
+            users.append(
+                User(
+                    email=patient_email.lower(),
+                    password_hash=hash_password(DEFAULT_PATIENT_PASSWORD),
+                    role="patient",
+                    full_name=p.full_name,
+                    doctor_id=None,
+                    patient_id=p.id,
+                )
+            )
+
+        db.add_all(users)
+        db.commit()
+
+        print(
+            f"Seeded {len(doctors)} doctors, {len(patients)} patients, "
+            f"{len(scans)} scans, {len(users)} auth users."
         )
-        scans.append(scan)
+        print(f"Doctor login password: {DEFAULT_DOCTOR_PASSWORD}")
+        print(f"Patient login password: {DEFAULT_PATIENT_PASSWORD}")
+        print("Example doctor login: amina.patel@insightx.dev")
 
-    db.add_all(scans)
-    db.commit()
+    finally:
+        db.close()
 
-    print(f"Added {len(scans)} scans.")
-    print("Database seeded successfully! Refresh your dashboard.")
 
-except Exception as e:
-    print(f"Error during seeding: {e}")
-finally:
-    db.close()
+if __name__ == "__main__":
+    seed()

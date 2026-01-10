@@ -1,21 +1,94 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import DashboardLayout from "../../layouts/DashboardLayout";
-import { listSessions, type ScanType } from "../../services/localScanStore";
+import { type ScanSession, type ScanType } from "../../services/localScanStore";
+import { deleteScan, listScans } from "../../services/scanService";
 import { useAuth } from "../../context/AuthContext";
+import type { ApiScan } from "../../types/scan";
 
 type Tab = "all" | ScanType;
+
+const mapScanToSession = (scan: ApiScan): ScanSession => {
+  const modality = String(scan.modality || "").toLowerCase();
+  const type: ScanType = modality === "mri" ? "brain" : "heart";
+  const modalityLabel =
+    modality === "mri" ? "MRI" : modality === "xray" ? "Xray" : "Other";
+  const statusRaw = String(scan.status || "").toLowerCase();
+  const status =
+    statusRaw === "failed"
+      ? "failed"
+      : statusRaw === "predicted" || statusRaw === "completed"
+      ? "done"
+      : "processing";
+  const progress = status === "done" || status === "failed" ? 100 : 50;
+  const summaryError = scan.summary?.error;
+
+  return {
+    id: String(scan.id),
+    patientId: String(scan.patient_id ?? ""),
+    type,
+    createdAt: scan.created_at ?? new Date().toISOString(),
+    fileName: scan.original_filename ?? scan.file_path ?? "Uploaded scan",
+    modality: modalityLabel,
+    notes: scan.clinician_note ?? undefined,
+    status,
+    progress,
+    error:
+      status === "failed"
+        ? typeof summaryError === "string" && summaryError.trim()
+          ? summaryError
+          : "Prediction failed"
+        : undefined,
+    riskLevel: scan.risk_level ?? undefined,
+    reviewStatus: scan.review_status ?? undefined,
+    clinicianNote: scan.clinician_note ?? undefined,
+    updatedAt: scan.updated_at ?? undefined,
+  };
+};
 
 export default function PatientScanHistory() {
   const { user } = useAuth();
   const patientId = user?.patientId;
   const [tab, setTab] = useState<Tab>("all");
+  const [sessions, setSessions] = useState<ScanSession[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
-  const sessions = useMemo(
-    () => (patientId ? listSessions(patientId) : []),
-    [patientId]
+  useEffect(() => {
+    if (!patientId) {
+      setSessions([]);
+      setLoading(false);
+      setError("Patient not found.");
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+    listScans({ patient_id: patientId })
+      .then((scans) => setSessions(scans.map(mapScanToSession)))
+      .catch((err: Error) => setError(err.message))
+      .finally(() => setLoading(false));
+  }, [patientId]);
+
+  const filtered = useMemo(
+    () => sessions.filter((s) => (tab === "all" ? true : s.type === tab)),
+    [sessions, tab]
   );
-  const filtered = sessions.filter((s) => (tab === "all" ? true : s.type === tab));
+
+  const handleDeleteScan = async (scanId: string) => {
+    if (!window.confirm("Delete this scan? This cannot be undone.")) return;
+    setDeletingId(scanId);
+    setError(null);
+    try {
+      await deleteScan(scanId);
+      setSessions((prev) => prev.filter((s) => s.id !== scanId));
+    } catch (err: any) {
+      setError(err?.message ?? "Unable to delete scan.");
+    } finally {
+      setDeletingId(null);
+    }
+  };
 
   return (
     <DashboardLayout>
@@ -48,7 +121,11 @@ export default function PatientScanHistory() {
         </div>
 
         <div className="bg-white border rounded-2xl shadow-sm">
-          {filtered.length === 0 ? (
+          {loading ? (
+            <div className="p-6 text-sm text-slate-600">Loading scans...</div>
+          ) : error ? (
+            <div className="p-6 text-sm text-rose-600">{error}</div>
+          ) : filtered.length === 0 ? (
             <div className="p-6 text-sm text-slate-600">No scan sessions yet.</div>
           ) : (
             <ul className="divide-y">
@@ -57,10 +134,15 @@ export default function PatientScanHistory() {
                   <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
                     <div className="flex flex-col">
                       <span className="text-sm font-semibold">
-                        {session.type.toUpperCase()} • {session.fileName ?? "Uploaded scan"}
+                        {session.type.toUpperCase()} - {session.fileName ?? "Uploaded scan"}
                       </span>
                       <span className="text-xs text-slate-500">
-                        {new Date(session.createdAt).toLocaleString()} • {session.modality ?? "Unknown"}
+                        {new Date(session.createdAt).toLocaleString()} - {session.modality ?? "Unknown"}
+                      </span>
+                      <span className="text-xs text-slate-500">
+                        Scan ID: {session.id}
+                        {session.riskLevel && ` | Risk: ${session.riskLevel}`}
+                        {session.reviewStatus && ` | Review: ${session.reviewStatus}`}
                       </span>
                       {session.notes && (
                         <span className="text-xs text-slate-600 line-clamp-2">
@@ -78,16 +160,9 @@ export default function PatientScanHistory() {
                             : "bg-amber-50 text-amber-700"
                         }`}
                       >
-                        {session.status} • {session.progress}%
+                        {session.status} - {session.progress}%
                       </span>
-                      {session.status === "done" ? (
-                        <Link
-                          to={`/dashboard/patient/${session.type}?sessionId=${session.id}`}
-                          className="px-3 py-1 rounded-full border text-slate-700"
-                        >
-                          Open
-                        </Link>
-                      ) : session.status === "processing" || session.status === "queued" ? (
+                      {session.status === "processing" || session.status === "queued" ? (
                         <div className="flex items-center gap-2">
                           <div className="h-2 w-24 bg-slate-100 rounded overflow-hidden">
                             <div
@@ -97,12 +172,25 @@ export default function PatientScanHistory() {
                           </div>
                         </div>
                       ) : (
-                        session.error && (
-                          <span className="text-rose-600">{session.error}</span>
-                        )
+                        <Link
+                          to={`/dashboard/scans/${session.id}`}
+                          className="px-3 py-1 rounded-full border text-slate-700"
+                        >
+                          Open
+                        </Link>
                       )}
+                      <button
+                        onClick={() => handleDeleteScan(session.id)}
+                        className="px-3 py-1 rounded-full border text-rose-600"
+                        disabled={deletingId === session.id}
+                      >
+                        {deletingId === session.id ? "Deleting..." : "Delete"}
+                      </button>
                     </div>
                   </div>
+                  {session.status === "failed" && session.error && (
+                    <div className="text-xs text-rose-600">{session.error}</div>
+                  )}
                 </li>
               ))}
             </ul>

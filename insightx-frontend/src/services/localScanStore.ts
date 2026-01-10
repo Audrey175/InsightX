@@ -13,6 +13,10 @@ export type ScanSession = {
   progress: number; // 0-100
   data?: any; // dashboard-compatible fields once done
   error?: string;
+  riskLevel?: string;
+  reviewStatus?: string;
+  clinicianNote?: string;
+  updatedAt?: string;
 };
 
 const STORAGE_KEY = "insightx_scan_sessions";
@@ -79,6 +83,14 @@ export function updateSession(
   sessions[idx] = { ...sessions[idx], ...patch };
   write(sessions);
   return sessions[idx];
+}
+
+export function deleteSession(sessionId: string): boolean {
+  const sessions = read();
+  const next = sessions.filter((s) => s.id !== sessionId);
+  if (next.length === sessions.length) return false;
+  write(next);
+  return true;
 }
 
 export function getLatestDoneSession(patientId: string, type: ScanType): ScanSession | undefined {

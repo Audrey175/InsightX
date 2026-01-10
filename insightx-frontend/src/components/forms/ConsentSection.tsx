@@ -1,7 +1,7 @@
 import React from "react";
 
 type Props = {
-  role: "patient" | "researcher" | "doctor";
+  role: "patient" | "doctor";
   acceptedTerms: boolean;
   acceptedResearchConsent: boolean;
   errors: {

@@ -7,14 +7,19 @@ from typing import Any, Optional
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+from pydantic import BaseModel
 from sqlalchemy import desc
 from sqlalchemy.orm import Session
 
 from backend.data.scan_database import get_db
 from backend.models.scan import Scan
+from backend.models.patient import Patient
+from backend.models.user import User
+from backend.routes.auth_router import get_current_user
+from backend.modules.mri_service import analyze_dicom_zip as analyze_mri
 from backend.modules.xray_service import analyze_xray
 
-router = APIRouter(prefix="/scans", tags=["Scans"])
+router = APIRouter()
 
 UPLOAD_ROOT = Path(__file__).resolve().parents[1] / "uploads" / "scans"
 
@@ -40,11 +45,40 @@ def _serialize_scan(scan: Scan) -> dict[str, Any]:
         "modality": scan.modality,
         "file_path": scan.file_path,
         "created_at": scan.created_at,
+        "updated_at": scan.updated_at,
         "status": scan.status,
+        "risk_level": scan.risk_level,
         "ai_result": parse_json(scan.ai_result_json),
         "summary": parse_json(scan.summary_json),
         "original_filename": scan.original_filename,
+        "review_status": scan.review_status,
+        "clinician_note": scan.clinician_note,
     }
+
+
+def _ensure_scan_access(scan: Scan, current: User, db: Session) -> None:
+    if current.role == "patient":
+        if current.patient_id is None or scan.patient_id != current.patient_id:
+            raise HTTPException(status_code=403, detail="Not authorized.")
+        return
+
+    if current.role == "doctor":
+        if current.doctor_id is None:
+            raise HTTPException(status_code=403, detail="Not authorized.")
+        if scan.doctor_id == current.doctor_id:
+            return
+        patient = db.query(Patient).filter(Patient.id == scan.patient_id).first()
+        if patient and patient.doctor_id == current.doctor_id:
+            return
+        raise HTTPException(status_code=403, detail="Not authorized.")
+
+    raise HTTPException(status_code=403, detail="Not authorized.")
+
+
+class ScanUpdate(BaseModel):
+    review_status: Optional[str] = None
+    clinician_note: Optional[str] = None
+    risk_level: Optional[str] = None
 
 
 def _severity_from_risk(risk_score: float) -> str:
@@ -116,9 +150,9 @@ def _build_xray_summary(result: dict) -> dict[str, Any]:
 @router.post("/upload-and-predict")
 async def upload_and_predict(
     file: UploadFile = File(...),
-    patient_id: str = Form(...),
+    patient_id: int = Form(...),
     modality: str = Form(...),
-    doctor_id: Optional[str] = Form(None),
+    doctor_id: Optional[int] = Form(None),
     db: Session = Depends(get_db),
 ):
     if not file:
@@ -133,7 +167,7 @@ async def upload_and_predict(
             detail="Unsupported modality. Use 'mri' or 'xray'.",
         )
 
-    safe_patient = _safe_slug(patient_id)
+    safe_patient = _safe_slug(str(patient_id))
     safe_name = Path(file.filename or "upload").name
     timestamp = datetime.utcnow().strftime("%Y%m%dT%H%M%S")
     token = uuid4().hex[:8]
@@ -153,9 +187,9 @@ async def upload_and_predict(
         doctor_id=doctor_id,
         modality=modality_norm,
         file_path=relative_path.as_posix(),
-        created_at=datetime.utcnow().isoformat(),
         status="uploaded",
         original_filename=file.filename,
+        review_status="draft",
     )
     db.add(scan)
     db.commit()
@@ -190,8 +224,8 @@ async def upload_and_predict(
 
 @router.get("")
 def list_scans(
-    patient_id: Optional[str] = None,
-    doctor_id: Optional[str] = None,
+    patient_id: Optional[int] = None,
+    doctor_id: Optional[int] = None,
     modality: Optional[str] = None,
     db: Session = Depends(get_db),
 ):
@@ -213,3 +247,54 @@ def get_scan(scan_id: int, db: Session = Depends(get_db)):
     if not scan:
         raise HTTPException(status_code=404, detail="Scan not found.")
     return _serialize_scan(scan)
+
+
+@router.patch("/{scan_id}")
+def update_scan(
+    scan_id: int,
+    payload: ScanUpdate,
+    db: Session = Depends(get_db),
+    current: User = Depends(get_current_user),
+):
+    scan = db.query(Scan).filter(Scan.id == scan_id).first()
+    if not scan:
+        raise HTTPException(status_code=404, detail="Scan not found.")
+
+    _ensure_scan_access(scan, current, db)
+
+    data = payload.dict(exclude_unset=True)
+    for key, value in data.items():
+        setattr(scan, key, value)
+
+    scan.updated_at = datetime.utcnow()
+
+    db.add(scan)
+    db.commit()
+    db.refresh(scan)
+    return _serialize_scan(scan)
+
+
+@router.delete("/{scan_id}")
+def delete_scan(
+    scan_id: int,
+    db: Session = Depends(get_db),
+    current: User = Depends(get_current_user),
+):
+    scan = db.query(Scan).filter(Scan.id == scan_id).first()
+    if not scan:
+        raise HTTPException(status_code=404, detail="Scan not found.")
+
+    _ensure_scan_access(scan, current, db)
+
+    file_path = Path(scan.file_path)
+    if not file_path.is_absolute():
+        file_path = Path(__file__).resolve().parents[1] / file_path
+    if file_path.exists():
+        try:
+            file_path.unlink()
+        except OSError:
+            pass
+
+    db.delete(scan)
+    db.commit()
+    return {"success": True}

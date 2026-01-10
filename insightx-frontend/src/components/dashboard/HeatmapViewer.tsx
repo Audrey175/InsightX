@@ -23,7 +23,7 @@ const HeatmapViewer: React.FC<HeatmapViewerProps> = ({ imageUrl }) => {
           crossOrigin="anonymous"
           alt="MRI Grad-CAM Heatmap"
           className="max-h-full max-w-full object-contain transition-opacity duration-700 ease-in-out"
-          onError={(e) => {
+          onError={() => {
             console.error("Failed to load heatmap:", imageUrl);
             setHasError(true);
           }}

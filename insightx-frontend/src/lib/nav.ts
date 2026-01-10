@@ -25,7 +25,6 @@ export function getSidebarNav(role: Role): SidebarNav {
     title: "Doctor Workspace",
     items: [
       { label: "Patients", to: "/dashboard/doctor/patients" },
-      { label: "Upload Scan", to: "/dashboard/doctor/upload" },
       { label: "Brain Scans", to: "/dashboard/doctor/brain" },
       { label: "Heart Scans", to: "/dashboard/doctor/heart" },
     ],
@@ -45,8 +44,6 @@ export function getSidebarNav(role: Role): SidebarNav {
     title: "Settings",
     items: [
       { label: "Account Settings", to: "/settings/account" },
-      { label: "System Settings", to: "/settings/system" },
-      { label: "Other Settings", to: "/settings/other" },
     ],
   };
 

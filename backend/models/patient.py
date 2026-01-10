@@ -1,5 +1,7 @@
-from sqlalchemy import Column, Integer, String, Date
-from backend.data.scan_database import Base  # Correct Import
+from sqlalchemy import Column, Date, ForeignKey, Integer, String
+from sqlalchemy.orm import relationship
+
+from backend.data.scan_database import Base
 
 class Patient(Base):
     __tablename__ = "patients"
@@ -14,3 +16,7 @@ class Patient(Base):
     medical_history = Column(String)  
     contact_number = Column(String)
     address = Column(String, nullable=True)
+    doctor_id = Column(Integer, ForeignKey("doctors.id"), nullable=True, index=True)
+
+    doctor = relationship("Doctor", back_populates="patients")
+    scans = relationship("Scan", back_populates="patient")

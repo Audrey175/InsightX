@@ -1,3 +1,5 @@
+import { API_BASE_URL } from "../services/api";
+
 export interface MRIPredictionResult {
   modality: string;
   reconstruction_engine: string; 
@@ -43,8 +45,7 @@ export async function predictMRI(file: File): Promise<MRIPredictionResult> {
   const formData = new FormData();
   formData.append("file", file);
 
-  // CHANGED: Use 127.0.0.1 instead of localhost for Mac stability
-  const response = await fetch("http://127.0.0.1:8000/predict/mri", {
+  const response = await fetch(`${API_BASE_URL}/predict/mri`, {
     method: "POST",
     body: formData,
   });

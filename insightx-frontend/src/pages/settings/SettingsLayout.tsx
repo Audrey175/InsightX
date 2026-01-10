@@ -15,22 +15,6 @@ export default function SettingsLayout() {
             >
               Account
             </NavLink>
-            <NavLink
-              to="/settings/system"
-              className={({ isActive }) =>
-                `px-3 py-2 rounded ${isActive ? "bg-slate-100 font-medium" : ""}`
-              }
-            >
-              System
-            </NavLink>
-            <NavLink
-              to="/settings/notifications"
-              className={({ isActive }) =>
-                `px-3 py-2 rounded ${isActive ? "bg-slate-100 font-medium" : ""}`
-              }
-            >
-              Notifications
-            </NavLink>
           </nav>
         </aside>
 

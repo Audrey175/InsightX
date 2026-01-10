@@ -4,25 +4,22 @@ import AuthLayout from "../../components/AuthLayout";
 import { Button } from "../../components/ui/button";
 import RoleSelector from "../../components/RoleSelector";
 import AccountInfoFields from "../../components/forms/AccountInfoFields.tsx";
-import ResearchInfoFields from "../../components/forms/ResearchInfoFields";
 import DoctorInfoFields from "../../components/forms/DoctorInfoFields";
 import PatientInfoFields from "../../components/forms/PatientInfoFields";
 import ConsentSection from "../../components/forms/ConsentSection";
 import { useAuth } from "../../context/AuthContext";
+import { USE_MOCK } from "../../services/api";
 
-type Role = "patient" | "researcher" | "doctor";
+type Role = "patient" | "doctor";
 
 const isRole = (value: string | undefined): value is Role =>
-  value === "patient" || value === "researcher" || value === "doctor";
+  value === "patient" || value === "doctor";
 
 type Values = {
   fullName: string;
   email: string;
   password: string;
   confirmPassword: string;
-  institution: string;
-  researchArea: string;
-  intendedUse: string;
   hospital: string;
   department: string;
   professionalId: string;
@@ -38,9 +35,6 @@ const initialValues: Values = {
   email: "",
   password: "",
   confirmPassword: "",
-  institution: "",
-  researchArea: "",
-  intendedUse: "",
   hospital: "",
   department: "",
   professionalId: "",
@@ -87,20 +81,19 @@ const SignUp: React.FC = () => {
     if (!vals.password) newErrors.password = "Password is required.";
     else if (vals.password.length < 8)
       newErrors.password = "Password must be at least 8 characters.";
+    else if (!/[A-Z]/.test(vals.password))
+      newErrors.password = "Password must include an uppercase letter.";
+    else if (!/[a-z]/.test(vals.password))
+      newErrors.password = "Password must include a lowercase letter.";
+    else if (!/[0-9]/.test(vals.password))
+      newErrors.password = "Password must include a number.";
+    else if (!/[^A-Za-z0-9]/.test(vals.password))
+      newErrors.password = "Password must include a special character.";
 
     if (!vals.confirmPassword)
       newErrors.confirmPassword = "Please confirm your password.";
     else if (vals.confirmPassword !== vals.password)
       newErrors.confirmPassword = "Passwords do not match.";
-
-    if (currentRole === "researcher") {
-      if (!vals.institution.trim())
-        newErrors.institution = "Institution is required.";
-      if (!vals.researchArea.trim())
-        newErrors.researchArea = "Research area is required.";
-      if (!vals.intendedUse.trim())
-        newErrors.intendedUse = "Intended use is required.";
-    }
 
     if (currentRole === "doctor") {
       if (!vals.hospital.trim())
@@ -111,7 +104,7 @@ const SignUp: React.FC = () => {
         newErrors.professionalId = "Professional ID is required.";
     }
 
-    if (currentRole === "patient") {
+    if (currentRole === "patient" && USE_MOCK) {
       if (!vals.patientId?.trim())
         newErrors.patientId = "Patient ID is required.";
     }
@@ -177,22 +170,6 @@ const SignUp: React.FC = () => {
           onChange={handleChange}
         />
 
-        {role === "researcher" && (
-          <ResearchInfoFields
-            values={{
-              institution: values.institution,
-              researchArea: values.researchArea,
-              intendedUse: values.intendedUse,
-            }}
-            errors={{
-              institution: errors.institution,
-              researchArea: errors.researchArea,
-              intendedUse: errors.intendedUse,
-            }}
-            onChange={handleChange}
-          />
-        )}
-
         {role === "doctor" && (
           <DoctorInfoFields
             values={{
@@ -209,7 +186,7 @@ const SignUp: React.FC = () => {
           />
         )}
 
-        {role === "patient" && (
+        {role === "patient" && USE_MOCK && (
           <PatientInfoFields
             values={{ patientId: values.patientId }}
             errors={{ patientId: errors.patientId }}

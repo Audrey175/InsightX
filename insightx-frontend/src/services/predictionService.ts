@@ -65,7 +65,10 @@ export async function predictMRI(file: File): Promise<PredictionResult> {
   const formData = new FormData();
   formData.append("file", file);
 
-  const response = await apiClient.post<PredictionResult>("/predict", formData);
+  const response = await apiClient.post<PredictionResult>(
+    "/predict/mri",
+    formData
+  );
   return response.data;
 }
 

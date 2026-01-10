@@ -1,3 +1,5 @@
+import { API_BASE_URL } from "../services/api";
+
 export interface XRayPredictionResult {
   filename: string;
   modality: "xray";
@@ -22,7 +24,7 @@ export async function predictXRay(file: File): Promise<XRayPredictionResult> {
   const formData = new FormData();
   formData.append("file", file);
 
-  const response = await fetch("http://127.0.0.1:8000/predict/xray", {
+  const response = await fetch(`${API_BASE_URL}/predict/xray`, {
     method: "POST",
     body: formData,
   });

@@ -1,4 +1,4 @@
-export type AppRole = "doctor" | "patient" | "researcher" | "general" | string;
+export type AppRole = "doctor" | "patient" | "general" | string;
 
 export function getRoleHomePath(role: AppRole): string {
   switch (role) {
@@ -6,7 +6,6 @@ export function getRoleHomePath(role: AppRole): string {
       return "/dashboard/doctor/patients";
     case "patient":
       return "/dashboard/patient/brain";
-    case "researcher":
     case "general":
       return "/dashboard";
     default:

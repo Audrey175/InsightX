@@ -1,27 +1,47 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import DashboardLayout from "../../layouts/DashboardLayout";
 import { Button } from "../../components/ui/button";
 import {
+  claimPatient,
   fetchDoctorPatients,
+  fetchUnassignedPatients,
   type DoctorPatientListItem,
+  unassignPatient,
 } from "../../services/doctorService";
 import { LoadingState } from "../../components/ui/LoadingState";
 import { ErrorState } from "../../components/ui/ErrorState";
 
 const DoctorPatientsList: React.FC = () => {
   const [patients, setPatients] = useState<DoctorPatientListItem[]>([]);
+  const [unassigned, setUnassigned] = useState<DoctorPatientListItem[]>([]);
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [actionMessage, setActionMessage] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [actionId, setActionId] = useState<string | null>(null);
+
+  const loadPatients = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const [assignedRows, unassignedRows] = await Promise.all([
+        fetchDoctorPatients(),
+        fetchUnassignedPatients(),
+      ]);
+      setPatients(assignedRows);
+      setUnassigned(unassignedRows);
+    } catch (err: any) {
+      setError(err?.message ?? "Unable to load patients.");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
-    setLoading(true);
-    fetchDoctorPatients()
-      .then(setPatients)
-      .catch((err: Error) => setError(err.message))
-      .finally(() => setLoading(false));
-  }, []);
+    loadPatients();
+  }, [loadPatients]);
 
   const filteredPatients = useMemo(() => {
     const query = search.toLowerCase();
@@ -31,6 +51,45 @@ const DoctorPatientsList: React.FC = () => {
         patient.id.toLowerCase().includes(query)
     );
   }, [patients, search]);
+
+  const filteredUnassigned = useMemo(() => {
+    const query = search.toLowerCase();
+    return unassigned.filter(
+      (patient) =>
+        patient.name.toLowerCase().includes(query) ||
+        patient.id.toLowerCase().includes(query)
+    );
+  }, [unassigned, search]);
+
+  const handleClaim = async (patientId: string) => {
+    setActionId(patientId);
+    setActionMessage(null);
+    setActionError(null);
+    try {
+      await claimPatient(patientId);
+      setActionMessage("Patient claimed.");
+      await loadPatients();
+    } catch (err: any) {
+      setActionError(err?.message ?? "Unable to claim patient.");
+    } finally {
+      setActionId(null);
+    }
+  };
+
+  const handleUnassign = async (patientId: string) => {
+    setActionId(patientId);
+    setActionMessage(null);
+    setActionError(null);
+    try {
+      await unassignPatient(patientId);
+      setActionMessage("Patient unassigned.");
+      await loadPatients();
+    } catch (err: any) {
+      setActionError(err?.message ?? "Unable to unassign patient.");
+    } finally {
+      setActionId(null);
+    }
+  };
 
   if (loading) {
     return (
@@ -69,6 +128,16 @@ const DoctorPatientsList: React.FC = () => {
             className="w-full md:w-64 rounded-lg border border-slate-200 px-3 py-2 text-sm shadow-sm"
           />
         </div>
+
+        {(actionMessage || actionError) && (
+          <div
+            className={`text-xs ${
+              actionError ? "text-rose-600" : "text-emerald-600"
+            }`}
+          >
+            {actionError ?? actionMessage}
+          </div>
+        )}
 
         <div className="bg-white border border-slate-100 rounded-2xl shadow-sm overflow-x-auto">
           <table className="min-w-full text-sm">
@@ -148,53 +217,103 @@ const DoctorPatientsList: React.FC = () => {
                     <td className="px-4 py-3 text-slate-700">{lastScan}</td>
                     <td className="px-4 py-3 text-right">
                       <div className="flex items-center justify-end gap-2 flex-wrap">
-                        <Link to={`/dashboard/doctor/upload/${patient.id}`}>
-                          <Button variant="secondary" className="border border-slate-200 text-xs">
-                            Upload Scan
-                          </Button>
-                        </Link>
                         <Link to={`/dashboard/doctor/history/${patient.id}`}>
                           <Button variant="secondary" className="border border-slate-200 text-xs">
                             History
                           </Button>
                         </Link>
-                        {hasBrain ? (
-                          <Link to={`/dashboard/doctor/brain/${patient.id}`}>
-                            <Button
-                              variant="secondary"
-                              className="border border-slate-200 text-xs"
-                            >
-                              Brain dashboard
-                            </Button>
-                          </Link>
-                        ) : (
+                        <Link to={`/dashboard/doctor/brain?patientId=${patient.id}`}>
                           <Button
                             variant="secondary"
                             className="border border-slate-200 text-xs"
-                            disabled
                           >
-                            Brain dashboard
+                            {hasBrain ? "Brain dashboard" : "Start brain scan"}
                           </Button>
-                        )}
-                        {hasHeart ? (
-                          <Link to={`/dashboard/doctor/heart/${patient.id}`}>
-                            <Button className="bg-sky-600 hover:bg-sky-700 text-xs">
-                              Heart dashboard
-                            </Button>
-                          </Link>
-                        ) : (
-                          <Button
-                            className="bg-slate-200 text-slate-500 text-xs"
-                            disabled
-                          >
-                            Heart dashboard
+                        </Link>
+                        <Link to={`/dashboard/doctor/heart?patientId=${patient.id}`}>
+                          <Button className="bg-sky-600 hover:bg-sky-700 text-xs">
+                            {hasHeart ? "Heart dashboard" : "Start heart scan"}
                           </Button>
-                        )}
+                        </Link>
+                        <Button
+                          variant="secondary"
+                          className="border border-slate-200 text-xs"
+                          onClick={() => handleUnassign(patient.id)}
+                          disabled={actionId === patient.id}
+                        >
+                          {actionId === patient.id ? "Updating..." : "Unassign"}
+                        </Button>
                       </div>
                     </td>
                   </tr>
                 );
               })}
+            </tbody>
+          </table>
+        </div>
+
+        <div className="bg-white border border-slate-100 rounded-2xl shadow-sm overflow-x-auto">
+          <div className="px-4 py-3 border-b border-slate-100">
+            <h2 className="text-sm font-semibold text-slate-900">
+              Unassigned Patients
+            </h2>
+            <p className="text-xs text-slate-500">
+              Claim a patient to add them to your workspace.
+            </p>
+          </div>
+          <table className="min-w-full text-sm">
+            <thead className="bg-slate-50 text-left text-xs text-slate-600 uppercase tracking-wide">
+              <tr>
+                <th className="px-4 py-3">Patient ID</th>
+                <th className="px-4 py-3">Name</th>
+                <th className="px-4 py-3">Age</th>
+                <th className="px-4 py-3 text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredUnassigned.length === 0 && (
+                <tr>
+                  <td
+                    colSpan={4}
+                    className="px-4 py-6 text-center text-slate-500"
+                  >
+                    No unassigned patients.
+                  </td>
+                </tr>
+              )}
+
+              {filteredUnassigned.map((patient) => (
+                <tr
+                  key={patient.id}
+                  className="border-t border-slate-100 hover:bg-slate-50"
+                >
+                  <td className="px-4 py-3 font-semibold text-slate-800">
+                    {patient.id}
+                  </td>
+                  <td className="px-4 py-3">
+                    <div className="flex items-center gap-3">
+                      <div className="h-8 w-8 rounded-full bg-slate-100 text-slate-700 flex items-center justify-center text-xs font-bold">
+                        {patient.avatar}
+                      </div>
+                      <span className="font-medium text-slate-900">
+                        {patient.name}
+                      </span>
+                    </div>
+                  </td>
+                  <td className="px-4 py-3 text-slate-700">
+                    {patient.age ?? "N/A"}
+                  </td>
+                  <td className="px-4 py-3 text-right">
+                    <Button
+                      className="bg-sky-600 hover:bg-sky-700 text-xs"
+                      onClick={() => handleClaim(patient.id)}
+                      disabled={actionId === patient.id}
+                    >
+                      {actionId === patient.id ? "Claiming..." : "Claim"}
+                    </Button>
+                  </td>
+                </tr>
+              ))}
             </tbody>
           </table>
         </div>

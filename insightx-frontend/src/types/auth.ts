@@ -1,4 +1,4 @@
-export type Role = "patient" | "doctor" | "researcher";
+export type Role = "patient" | "doctor";
 
 export type AuthUser = {
   id: string;

@@ -1,5 +1,4 @@
-import React, { useEffect, useState } from 'react';
-import axios from 'axios'; // Ensure axios is imported
+import { useEffect, useState } from 'react';
 import { 
   Users, // Added missing import
   AlertTriangle, 
@@ -11,6 +10,7 @@ import DashboardLayout from '../../layouts/DashboardLayout';
 import StatCard from '../../components/dashboard/StatCard';
 import RiskDistributionChart from '../../components/dashboard/RiskDistributionChart';
 import ScanCoverageChart from '../../components/dashboard/ScanCoverageChart';
+import { USE_MOCK, simulateRequest, apiClient } from '../../services/api';
 
 // 1. Define the API response shape
 interface DashboardData {
@@ -32,25 +32,77 @@ interface DashboardData {
   }>;
 }
 
+const mockDashboardData: DashboardData = {
+  stats: {
+    totalPatients: 128,
+    totalScans: 342,
+    activeScans: 9,
+    criticalCases: 6,
+  },
+  riskDistribution: [
+    { name: "Low", value: 180 },
+    { name: "Medium", value: 120 },
+    { name: "High", value: 42 },
+  ],
+  scanCoverage: [
+    { subject: "MRI", A: 140, fullMark: 150 },
+    { subject: "Xray", A: 120, fullMark: 150 },
+    { subject: "CT", A: 82, fullMark: 150 },
+  ],
+  recentScans: [
+    {
+      id: 1,
+      patient_name: "Mock Patient A",
+      type: "MRI",
+      date: "2025-01-08",
+      status: "Processing",
+      risk: "Medium",
+    },
+    {
+      id: 2,
+      patient_name: "Mock Patient B",
+      type: "Xray",
+      date: "2025-01-07",
+      status: "Completed",
+      risk: "Low",
+    },
+  ],
+};
+
 const GeneralDashboard = () => {
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    let active = true;
     const fetchDashboardData = async () => {
       try {
-        const response = await axios.get('http://localhost:8000/api/dashboard/stats');
+        setLoading(true);
+        setError(null);
+        if (USE_MOCK) {
+          const mock = await simulateRequest(() => mockDashboardData, 200);
+          if (!active) return;
+          setData(mock);
+          return;
+        }
+        const response = await apiClient.get('/api/dashboard/stats');
+        if (!active) return;
         setData(response.data);
       } catch (err) {
         console.error("Failed to fetch dashboard stats:", err);
         setError("Failed to load dashboard data.");
       } finally {
-        setLoading(false);
+        if (active) {
+          setLoading(false);
+        }
       }
     };
 
     fetchDashboardData();
+    return () => {
+      active = false;
+    };
   }, []);
 
   if (loading) return <div>Loading dashboard...</div>;
@@ -116,35 +168,52 @@ const GeneralDashboard = () => {
         <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
           <h2 className="text-lg font-semibold mb-4">Recent Scans</h2>
           <div className="space-y-4">
-            {recentScans.map((scan) => (
-              <div key={scan.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                <div className="flex items-center gap-4">
-                  <div className="p-2 bg-blue-100 text-blue-600 rounded-lg">
-                    <Brain className="w-5 h-5" />
+            {recentScans.map((scan) => {
+              const statusRaw = String(scan.status || "");
+              const statusNormalized = statusRaw.toLowerCase();
+              const statusLabel =
+                statusNormalized === "predicted" || statusNormalized === "completed"
+                  ? "Completed"
+                  : statusNormalized === "processing" || statusNormalized === "uploaded"
+                  ? "Processing"
+                  : statusRaw || "Unknown";
+
+              const riskRaw = String(scan.risk || "");
+              const riskLabel = riskRaw
+                ? riskRaw.charAt(0).toUpperCase() + riskRaw.slice(1)
+                : "Unknown";
+              const riskNormalized = riskLabel.toLowerCase();
+
+              return (
+                <div key={scan.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                  <div className="flex items-center gap-4">
+                    <div className="p-2 bg-blue-100 text-blue-600 rounded-lg">
+                      <Brain className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <p className="font-medium text-gray-900">{scan.patient_name}</p>
+                      <p className="text-sm text-gray-500">{scan.type} - {scan.date}</p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="font-medium text-gray-900">{scan.patient_name}</p>
-                    <p className="text-sm text-gray-500">{scan.type} • {scan.date}</p>
+                  <div className="flex items-center gap-3">
+                    <span className={`px-3 py-1 rounded-full text-xs font-medium ${
+                      statusLabel === "Completed" ? "bg-green-100 text-green-700" :
+                      statusLabel === "Processing" ? "bg-blue-100 text-blue-700" :
+                      "bg-yellow-100 text-yellow-700"
+                    }`}>
+                      {statusLabel}
+                    </span>
+                    <span className={`px-3 py-1 rounded-full text-xs font-medium ${
+                      riskNormalized === "high" ? "bg-red-100 text-red-700" :
+                      riskNormalized === "medium" ? "bg-yellow-100 text-yellow-700" :
+                      "bg-green-100 text-green-700"
+                    }`}>
+                      {riskLabel} Risk
+                    </span>
                   </div>
                 </div>
-                <div className="flex items-center gap-3">
-                  <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-                    scan.status === 'Completed' ? 'bg-green-100 text-green-700' :
-                    scan.status === 'Processing' ? 'bg-blue-100 text-blue-700' :
-                    'bg-yellow-100 text-yellow-700'
-                  }`}>
-                    {scan.status}
-                  </span>
-                  <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-                    scan.risk === 'High' ? 'bg-red-100 text-red-700' :
-                    scan.risk === 'Medium' ? 'bg-yellow-100 text-yellow-700' :
-                    'bg-green-100 text-green-700'
-                  }`}>
-                    {scan.risk} Risk
-                  </span>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       </div>

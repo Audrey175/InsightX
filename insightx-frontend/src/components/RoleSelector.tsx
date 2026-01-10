@@ -2,7 +2,7 @@ import React from "react";
 import { Link } from "react-router-dom";
 
 interface RoleSelectorProps {
-  current: "patient" | "researcher" | "doctor";
+  current: "patient" | "doctor";
 }
 
 const RoleSelector: React.FC<RoleSelectorProps> = ({ current }) => {
@@ -14,12 +14,6 @@ const RoleSelector: React.FC<RoleSelectorProps> = ({ current }) => {
       link: "/signup/patient",
     },
     {
-      key: "researcher" as const,
-      title: "Researcher",
-      desc: "Data & insights",
-      link: "/signup/researcher",
-    },
-    {
       key: "doctor" as const,
       title: "Doctor",
       desc: "Clinical tools",
@@ -28,7 +22,7 @@ const RoleSelector: React.FC<RoleSelectorProps> = ({ current }) => {
   ];
 
   return (
-    <div className="grid grid-cols-3 gap-3 mb-6">
+    <div className="grid grid-cols-2 gap-3 mb-6">
       {roles.map((r) => {
         const isActive = r.key === current;
 

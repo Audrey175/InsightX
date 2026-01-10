@@ -24,9 +24,17 @@ const PatientSelector: React.FC<Props> = ({ currentId, organ }) => {
       .finally(() => setLoading(false));
   }, []);
 
+  useEffect(() => {
+    if (!currentId && patients.length) {
+      navigate(`/dashboard/doctor/${organ}?patientId=${patients[0].id}`, {
+        replace: true,
+      });
+    }
+  }, [currentId, patients, organ, navigate]);
+
   const handleChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const newId = e.target.value;
-    navigate(`/dashboard/doctor/${organ}/${newId}`);
+    navigate(`/dashboard/doctor/${organ}?patientId=${newId}`);
   };
 
   if (loading) {
@@ -41,7 +49,7 @@ const PatientSelector: React.FC<Props> = ({ currentId, organ }) => {
 
   return (
     <select
-      value={currentId}
+      value={currentId || patients[0]?.id || ""}
       onChange={handleChange}
       className="border rounded-lg px-2 py-1 text-xs bg-white"
     >

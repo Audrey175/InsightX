@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import DashboardLayout from "../../layouts/DashboardLayout";
 import { useAuth } from "../../context/AuthContext";
+import { USE_MOCK } from "../../services/api";
 import { fetchPatientBrainScan, fetchPatientHeartScan } from "../../services/patientService";
 import type { PatientBrainRecord } from "../../data/patientBrainData";
 import type { PatientHeartRecord } from "../../data/patientHeartData";
@@ -11,7 +12,7 @@ import { ErrorState } from "../../components/ui/ErrorState";
 export default function PatientScansOverview() {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const patientId = user?.patientId ?? "P-0001";
+  const patientId = user?.patientId ?? (USE_MOCK ? "P-0001" : undefined);
 
   const [brain, setBrain] = useState<PatientBrainRecord | null>(null);
   const [heart, setHeart] = useState<PatientHeartRecord | null>(null);
@@ -19,6 +20,11 @@ export default function PatientScansOverview() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    if (!patientId) {
+      setError("Patient not found.");
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     setError(null);
 
@@ -50,13 +56,13 @@ export default function PatientScansOverview() {
   const cards = [
     {
       title: "Brain",
-      available: !!brain,
+      hasData: !!brain,
       onOpen: () => navigate("/dashboard/patient/brain"),
       description: brain ? "Latest brain scan available." : "No brain scan uploaded yet.",
     },
     {
       title: "Heart",
-      available: !!heart,
+      hasData: !!heart,
       onOpen: () => navigate("/dashboard/patient/heart"),
       description: heart ? "Latest heart scan available." : "No heart scan uploaded yet.",
     },
@@ -72,12 +78,14 @@ export default function PatientScansOverview() {
               Check availability for your brain and heart scans.
             </p>
           </div>
-          <Link
-            to="/dashboard/patient/history"
-            className="px-4 py-2 rounded-md text-sm border border-slate-200 text-slate-700 hover:bg-slate-50"
-          >
-            View History
-          </Link>
+          <div className="flex items-center gap-2">
+            <Link
+              to="/dashboard/patient/history"
+              className="px-4 py-2 rounded-md text-sm border border-slate-200 text-slate-700 hover:bg-slate-50"
+            >
+              View History
+            </Link>
+          </div>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -90,26 +98,27 @@ export default function PatientScansOverview() {
                 </div>
                 <span
                   className={`text-xs px-3 py-1 rounded-full ${
-                    card.available
+                    card.hasData
                       ? "bg-emerald-50 text-emerald-700"
                       : "bg-slate-100 text-slate-600"
                   }`}
                 >
-                  {card.available ? "Available" : "No data"}
+                  {card.hasData ? "Available" : "No data"}
                 </span>
               </div>
 
               <div className="flex flex-wrap gap-2">
                 <button
-                  disabled={!card.available}
-                  onClick={card.available ? card.onOpen : undefined}
+                  onClick={card.onOpen}
                   className={`px-4 py-2 rounded-md text-sm ${
-                    card.available
+                    card.hasData
                       ? "bg-sky-600 text-white hover:bg-sky-700"
-                      : "bg-slate-100 text-slate-500 cursor-not-allowed"
+                      : "bg-slate-900 text-white hover:bg-black"
                   }`}
                 >
-                  {card.available ? `Open ${card.title} Dashboard` : "No data"}
+                  {card.hasData
+                    ? `Open ${card.title} Dashboard`
+                    : `Upload ${card.title} Scan`}
                 </button>
                 <Link
                   to="/assistant"

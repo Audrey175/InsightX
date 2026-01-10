@@ -4,7 +4,7 @@ import { Card, CardContent } from "../components/ui/card";
 import { ShieldCheck, ScanLine, Globe2, Eye } from "lucide-react";
 import { Link } from "react-router-dom";
 import BrainHero from "../assets/brainhome.png";
-import Researchers from "../assets/researchers.png";
+import Clinicians from "../assets/clinicians.png";
 import { useAuth } from "../context/AuthContext";
 import { getRoleHomePath } from "../lib/paths";
 
@@ -142,8 +142,8 @@ const LandingPage: React.FC = () => {
           <div className="flex items-center justify-center">
             <div className="h-56 w-full max-w-sm overflow-hidden rounded-3xl bg-slate-900 shadow-lg">
               <img
-        src={Researchers}
-        alt="Researchers"
+        src={Clinicians}
+        alt="Clinicians"
         className="rounded-3xl"
           />
          </div>

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { useParams, useSearchParams, useNavigate } from "react-router-dom";
+import { useParams, useSearchParams } from "react-router-dom";
 import { jsPDF } from "jspdf";
 import html2canvas from "html2canvas";
 
@@ -9,26 +9,30 @@ import MRIViewer from "../../components/dashboard/MRI_Viewer";
 import HeatmapViewer from "../../components/dashboard/HeatmapViewer";
 import PatientSelector from "../../components/PatientSelector";
 import { LoadingState } from "../../components/ui/LoadingState";
+import { ErrorState } from "../../components/ui/ErrorState";
 import { Button } from "../../components/ui/button";
 
 // Services & Types
-import { predictMRI } from "../../api/predict";
-import type { MRIPredictionResult } from "../../api/predict";
-import { fetchDoctorBrainScan } from "../../services/doctorService";
-import type { DoctorBrainScanRecord } from "../../data/doctorBrainData";
+import { API_BASE_URL } from "../../services/api";
 import {
-  getLatestDoneSession,
-  getSession,
-} from "../../services/localScanStore";
-import { findPatientById } from "../../data/fakeDatabase";
+  fetchDoctorBrainScan,
+  fetchPatientRecord,
+} from "../../services/doctorService";
+import type { DoctorBrainScanRecord } from "../../data/doctorBrainData";
+import { useAuth } from "../../context/AuthContext";
+import { uploadScan, updateScan, deleteScan } from "../../services/scanService";
+import type { ApiScan } from "../../types/scan";
 
 // Assets
 import BrainHero from "../../assets/brainhome.png";
 
+const toApiUrl = (path: string) => (API_BASE_URL ? `${API_BASE_URL}${path}` : path);
+
 const DoctorBrainDashboard: React.FC = () => {
   const [viewMode, setViewMode] = useState<"heatmap" | "volume">("heatmap");
-  const { patientId } = useParams<{ patientId: string }>();
+  const { patientId: routePatientId } = useParams<{ patientId?: string }>();
   const [searchParams] = useSearchParams();
+  const { user } = useAuth();
 
   const reportRef = useRef<HTMLDivElement>(null);
   const [isExporting, setIsExporting] = useState(false);
@@ -36,70 +40,57 @@ const DoctorBrainDashboard: React.FC = () => {
   const [vtkSnapshot, setVtkSnapshot] = useState<string | null>(null);
 
   const [scan, setScan] = useState<DoctorBrainScanRecord | null>(null);
+  const [activeScan, setActiveScan] = useState<ApiScan | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
-  const [prediction, setPrediction] = useState<MRIPredictionResult | null>(
-    null
-  );
-  const [mriLoading, setMriLoading] = useState<boolean>(false);
-  const [mriError, setMriError] = useState<string | null>(null);
+  const [uploading, setUploading] = useState<boolean>(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [clinicianNote, setClinicianNote] = useState("");
+  const [actionMessage, setActionMessage] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
 
-  const sessionId = searchParams.get("sessionId");
-  const patientInfo = findPatientById(patientId ?? "");
-
+  const patientId = searchParams.get("patientId") ?? routePatientId ?? "";
   const NO_SPLIT_CLASS = "break-inside-avoid page-break-inside-avoid block";
 
-  const mapSession = () => {
-    if (!patientId) return null;
-    const session = sessionId
-      ? getSession(sessionId)
-      : getLatestDoneSession(patientId, "brain");
-    if (
-      !session ||
-      session.status !== "done" ||
-      session.type !== "brain" ||
-      !session.data?.doctor
-    )
-      return null;
-    const sData = session.data.doctor as Partial<DoctorBrainScanRecord>;
-    return {
-      patientId,
-      patientName: sData.patientName ?? patientInfo?.name ?? "Unknown patient",
-      avatar: sData.avatar ?? patientInfo?.avatar ?? "NA",
-      lastScanDate: sData.lastScanDate ?? session.createdAt,
-      scanId: sData.scanId ?? `B-SESSION-${session.id}`,
-      oxygenation: sData.oxygenation ?? 0,
-      stress: sData.stress ?? "Normal",
-      focus: sData.focus ?? "Stable",
-      performanceScore: sData.performanceScore ?? 0,
-      injury: sData.injury ?? {
-        location: "N/A",
-        type: "N/A",
-        size: "N/A",
-        edema: "N/A",
-        imaging: [],
-      },
-      risks: sData.risks ?? [],
-      relatedCases: sData.relatedCases ?? [],
-    } as DoctorBrainScanRecord;
-  };
-
   useEffect(() => {
+    if (!patientId) return;
     const load = async () => {
-      if (!patientId) {
-        setError("Patient not found.");
-        setLoading(false);
-        return;
-      }
       setLoading(true);
+      setError(null);
+      setActiveScan(null);
+      setActionMessage(null);
+      setActionError(null);
       try {
-        const fromSession = mapSession();
-        if (fromSession) {
-          setScan(fromSession);
+        const record = await fetchDoctorBrainScan(patientId);
+        if (record) {
+          setScan(record);
           return;
         }
-        const record = await fetchDoctorBrainScan(patientId);
-        setScan(record);
+        const patient = await fetchPatientRecord(patientId);
+        if (!patient) {
+          setError("Patient not found.");
+          return;
+        }
+        setScan({
+          patientId,
+          patientName: patient.name ?? "Unknown patient",
+          avatar: patient.avatar ?? "NA",
+          lastScanDate: undefined,
+          scanId: "N/A",
+          oxygenation: 0,
+          stress: "Low",
+          focus: "Stable",
+          performanceScore: 0,
+          injury: {
+            location: "N/A",
+            type: "N/A",
+            size: "N/A",
+            edema: "N/A",
+            imaging: [],
+          },
+          risks: ["No scans yet."],
+          relatedCases: [],
+        });
       } catch (err: any) {
         setError(err?.message ?? "Unable to load scan.");
       } finally {
@@ -107,21 +98,69 @@ const DoctorBrainDashboard: React.FC = () => {
       }
     };
     load();
-  }, [patientId, sessionId]);
+  }, [patientId]);
 
   const handleMRIUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    setPrediction(null);
-    setMriError(null);
-    setMriLoading(true);
+    if (!patientId) {
+      setUploadError("Select a patient before uploading.");
+      return;
+    }
+    setUploadError(null);
+    setUploading(true);
     try {
-      const result = await predictMRI(file);
-      setPrediction(result);
-    } catch (err) {
-      setMriError("Failed to analyze MRI.");
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("patient_id", patientId);
+      formData.append("modality", "mri");
+      if (user?.doctorId) {
+        formData.append("doctor_id", user.doctorId);
+      }
+
+      const created = await uploadScan(formData, {
+        patientId,
+        modality: "mri",
+        doctorId: user?.doctorId ?? null,
+      });
+      setActiveScan(created);
+      setClinicianNote(created.clinician_note ?? "");
+      setActionMessage("Scan uploaded.");
+    } catch (err: any) {
+      setUploadError(err?.message ?? "Failed to analyze MRI.");
     } finally {
-      setMriLoading(false);
+      setUploading(false);
+    }
+  };
+
+  const handleSave = async () => {
+    if (!activeScan?.id) return;
+    setActionMessage(null);
+    setActionError(null);
+    try {
+      const updated = await updateScan(activeScan.id, {
+        review_status: "saved",
+        clinician_note: clinicianNote,
+      });
+      setActiveScan(updated);
+      setClinicianNote(updated.clinician_note ?? "");
+      setActionMessage("Scan saved.");
+    } catch (err: any) {
+      setActionError(err?.message ?? "Failed to save scan.");
+    }
+  };
+
+  const handleDiscard = async () => {
+    if (!activeScan?.id) return;
+    setActionMessage(null);
+    setActionError(null);
+    try {
+      await deleteScan(activeScan.id);
+      setActiveScan(null);
+      setClinicianNote("");
+      setActionMessage("Scan discarded.");
+    } catch (err: any) {
+      setActionError(err?.message ?? "Failed to discard scan.");
     }
   };
 
@@ -188,12 +227,39 @@ const DoctorBrainDashboard: React.FC = () => {
     }, 400);
   };
 
+  const aiResult = activeScan?.ai_result ?? null;
+  const summary = activeScan?.summary ?? null;
+  const keyFindings = summary?.key_findings ?? null;
+  const hasVisualization = Boolean(
+    aiResult?.heatmap_slice || aiResult?.reconstruction_file
+  );
+
+  if (!patientId) {
+    return (
+      <DashboardLayout>
+        <div className="p-6 space-y-3">
+          <p className="text-sm text-slate-600">
+            Select a patient to view scans.
+          </p>
+          <PatientSelector currentId="" organ="brain" />
+        </div>
+      </DashboardLayout>
+    );
+  }
+
   if (loading)
     return (
       <DashboardLayout>
         <LoadingState message="Loading..." />
       </DashboardLayout>
     );
+  if (error) {
+    return (
+      <DashboardLayout>
+        <ErrorState message={error} />
+      </DashboardLayout>
+    );
+  }
 
   return (
     <DashboardLayout>
@@ -201,7 +267,7 @@ const DoctorBrainDashboard: React.FC = () => {
         <div className="fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-black/70 backdrop-blur-sm">
           <div className="animate-spin rounded-full h-14 w-14 border-t-2 border-b-2 border-sky-500 mb-6" />
           <p className="text-sky-400 text-sm font-semibold uppercase tracking-widest">
-            Generating Clinical Report…
+                        Generating Clinical Report...
           </p>
         </div>
       )}
@@ -244,7 +310,7 @@ const DoctorBrainDashboard: React.FC = () => {
                   Export PDF
                 </Button>
                 <PatientSelector
-                  currentId={scan?.patientId || ""}
+                  currentId={patientId || scan?.patientId || ""}
                   organ="brain"
                 />
               </div>
@@ -270,52 +336,122 @@ const DoctorBrainDashboard: React.FC = () => {
                     />
                   )}
                 </div>
-                {mriLoading && (
+                {uploading && (
                   <p className="text-sky-600 text-xs animate-pulse font-bold mb-4">
                     RECONSTRUCTING VOLUMETRIC SPACE...
                   </p>
                 )}
 
-                {mriError && (
+                {uploadError && (
                   <p className="text-red-500 text-xs font-bold uppercase mb-4">
-                    {mriError}
+                    {uploadError}
                   </p>
                 )}
 
-                {prediction ? (
-                  <div className="grid grid-cols-2 gap-x-8 gap-y-3 text-xs border-t pt-4">
-                    <div>
-                      <p>
-                        <span className="text-slate-400">Diagnosis:</span>{" "}
-                        <span className="text-blue-700 font-bold uppercase">
-                          {prediction.classification.tumor_type}
-                        </span>
-                      </p>
-                      <p>
-                        <span className="text-slate-400">Confidence:</span>{" "}
-                        <span className="font-bold">
-                          {(prediction.classification.confidence * 100).toFixed(
-                            1
-                          )}
-                          %
-                        </span>
-                      </p>
+                {activeScan ? (
+                  <div className="space-y-3 text-xs border-t pt-4">
+                    <div className="grid grid-cols-2 gap-x-8 gap-y-2">
+                      <div className="space-y-1">
+                        <p>
+                          <span className="text-slate-400">Scan ID:</span>{" "}
+                          <span className="font-bold">{activeScan.id}</span>
+                        </p>
+                        <p>
+                          <span className="text-slate-400">Status:</span>{" "}
+                          <span className="font-bold">{activeScan.status ?? "N/A"}</span>
+                        </p>
+                        <p>
+                          <span className="text-slate-400">Risk:</span>{" "}
+                          <span className="font-bold">{activeScan.risk_level ?? "N/A"}</span>
+                        </p>
+                      </div>
+                      <div className="space-y-1">
+                        <p>
+                          <span className="text-slate-400">Created:</span>{" "}
+                          <span className="font-bold">
+                            {activeScan.created_at
+                              ? new Date(activeScan.created_at).toLocaleString()
+                              : "N/A"}
+                          </span>
+                        </p>
+                        <p>
+                          <span className="text-slate-400">Review:</span>{" "}
+                          <span className="font-bold">
+                            {activeScan.review_status ?? "draft"}
+                          </span>
+                        </p>
+                        <p>
+                          <span className="text-slate-400">Modality:</span>{" "}
+                          <span className="font-bold">{activeScan.modality ?? "mri"}</span>
+                        </p>
+                      </div>
                     </div>
-                    <div>
-                      <p>
-                        <span className="text-slate-400">Tumor Detected:</span>{" "}
-                        <span className="font-bold text-red-500">
-                          {prediction.segmentation.tumor_detected
-                            ? "YES"
-                            : "NO"}
-                        </span>
-                      </p>
-                      <p>
-                        <span className="text-slate-400">Volume:</span>{" "}
-                        <span className="font-bold">
-                          {prediction.segmentation.tumor_size_pixels}px³
-                        </span>
-                      </p>
+
+                    {summary && (
+                      <div className="border-t pt-3 space-y-2">
+                        <p>
+                          <span className="text-slate-400">Severity:</span>{" "}
+                          <span className="font-bold uppercase">
+                            {summary.severity ?? "N/A"}
+                          </span>
+                        </p>
+                        <p>
+                          <span className="text-slate-400">Recommendation:</span>{" "}
+                          <span className="font-bold">
+                            {summary.recommendation ?? "N/A"}
+                          </span>
+                        </p>
+                        {summary.key_findings && (
+                          <div className="text-[11px] text-slate-600">
+                            <p className="uppercase text-[10px] text-slate-400 font-bold">
+                              Key Findings
+                            </p>
+                            <ul className="list-disc list-inside">
+                              {Object.entries(summary.key_findings).map(
+                                ([key, value]) => (
+                                  <li key={key}>
+                                    {key}: {String(value)}
+                                  </li>
+                                )
+                              )}
+                            </ul>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    <div className="border-t pt-3 space-y-2">
+                      <label className="text-[10px] uppercase text-slate-400 font-bold">
+                        Clinician Note
+                      </label>
+                      <textarea
+                        value={clinicianNote}
+                        onChange={(e) => setClinicianNote(e.target.value)}
+                        rows={3}
+                        className="w-full rounded border border-slate-200 px-3 py-2 text-xs"
+                        placeholder="Add a note for this scan..."
+                      />
+                      {actionMessage && (
+                        <p className="text-[11px] text-emerald-600">{actionMessage}</p>
+                      )}
+                      {actionError && (
+                        <p className="text-[11px] text-rose-600">{actionError}</p>
+                      )}
+                      <div className="flex gap-2">
+                        <Button
+                          onClick={handleSave}
+                          className="bg-sky-600 hover:bg-sky-700 text-xs"
+                        >
+                          Save
+                        </Button>
+                        <Button
+                          onClick={handleDiscard}
+                          variant="secondary"
+                          className="text-xs"
+                        >
+                          Discard
+                        </Button>
+                      </div>
                     </div>
                   </div>
                 ) : (
@@ -333,7 +469,7 @@ const DoctorBrainDashboard: React.FC = () => {
                   <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
                     3D Visualization Engine
                   </span>
-                  {!isExporting && prediction && (
+                  {!isExporting && hasVisualization && (
                     <div className="flex gap-1 bg-slate-100 p-1 rounded-full">
                       <button
                         onClick={() => setViewMode("volume")}
@@ -367,14 +503,14 @@ const DoctorBrainDashboard: React.FC = () => {
                       alt="PDF Snapshot"
                     />
                   )}
-                  {prediction ? (
+                  {hasVisualization ? (
                     viewMode === "heatmap" ? (
                       <HeatmapViewer
-                        imageUrl={`http://127.0.0.1:8000${prediction.heatmap_slice}`}
+                        imageUrl={toApiUrl(String(aiResult?.heatmap_slice || ""))}
                       />
                     ) : (
                       <MRIViewer
-                        volumeUrl={`http://127.0.0.1:8000${prediction.reconstruction_file}`}
+                        volumeUrl={toApiUrl(String(aiResult?.reconstruction_file || ""))}
                       />
                     )
                   ) : (
@@ -421,44 +557,42 @@ const DoctorBrainDashboard: React.FC = () => {
                 </div>
               </div>
 
-              {prediction && (
+              {aiResult && (
                 <div
                   className={`${NO_SPLIT_CLASS} bg-white rounded-2xl p-6 shadow-sm border border-slate-200`}
                 >
                   <h2 className="text-xs font-bold text-slate-800 uppercase mb-4 tracking-wider">
-                    Pathology Probabilities
+                    Reconstruction Details
                   </h2>
-                  <div className="space-y-3">
-                    {Object.entries(
-                      prediction.classification.probabilities
-                    ).map(([key, value]) => (
-                      <div key={key} className="space-y-1">
-                        <div className="flex justify-between text-[10px] font-bold uppercase">
-                          <span
-                            className={
-                              prediction.classification.tumor_type === key
-                                ? "text-sky-600"
-                                : "text-slate-400"
-                            }
-                          >
-                            {key}
-                          </span>
-                          <span className="text-slate-900">
-                            {(value * 100).toFixed(1)}%
-                          </span>
-                        </div>
-                        <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                          <div
-                            className={`h-full ${
-                              prediction.classification.tumor_type === key
-                                ? "bg-sky-500"
-                                : "bg-slate-300"
-                            }`}
-                            style={{ width: `${value * 100}%` }}
-                          />
-                        </div>
-                      </div>
-                    ))}
+                  <div className="space-y-2 text-xs text-slate-700">
+                    <div>
+                      <span className="text-slate-400">Series UID:</span>{" "}
+                      <span className="font-bold">{aiResult.series_uid ?? "N/A"}</span>
+                    </div>
+                    <div>
+                      <span className="text-slate-400">Series Detected:</span>{" "}
+                      <span className="font-bold">{aiResult.series_detected ?? "N/A"}</span>
+                    </div>
+                    <div>
+                      <span className="text-slate-400">Volume Shape:</span>{" "}
+                      <span className="font-bold">
+                        {aiResult.volume_shape
+                          ? `${aiResult.volume_shape.depth}x${aiResult.volume_shape.height}x${aiResult.volume_shape.width}`
+                          : "N/A"}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-slate-400">Mean Intensity:</span>{" "}
+                      <span className="font-bold">
+                        {aiResult.statistics?.mean_intensity ?? "N/A"}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-slate-400">Max Intensity:</span>{" "}
+                      <span className="font-bold">
+                        {aiResult.statistics?.max_intensity ?? "N/A"}
+                      </span>
+                    </div>
                   </div>
                 </div>
               )}
@@ -476,15 +610,12 @@ const DoctorBrainDashboard: React.FC = () => {
                       AI-Detected Coordinates
                     </span>
                     <span className="text-xs font-bold text-slate-800">
-                      {prediction?.segmentation?.tumor_detected &&
-                      prediction.segmentation.tumor_location ? (
+                      {keyFindings?.tumor_location ? (
                         <span className="font-mono text-sky-600">
-                          X:{" "}
-                          {prediction.segmentation.tumor_location.x.toFixed(1)},
-                          Y:{" "}
-                          {prediction.segmentation.tumor_location.y.toFixed(1)}
+                          X: {Number(keyFindings.tumor_location.x).toFixed(1)},
+                          Y: {Number(keyFindings.tumor_location.y).toFixed(1)}
                         </span>
-                      ) : prediction ? (
+                      ) : summary ? (
                         <span className="text-emerald-600 uppercase">
                           Clear / No Lesion
                         </span>
@@ -496,13 +627,13 @@ const DoctorBrainDashboard: React.FC = () => {
                     </span>
                   </div>
 
-                  {/* 2. Pathology Type */}
+                  {/* 2. Severity */}
                   <div className="flex justify-between border-b border-slate-50 pb-2">
                     <span className="text-xs text-slate-500">
-                      Pathology Classification
+                      Severity
                     </span>
                     <span className="text-xs font-bold text-slate-800 uppercase">
-                      {prediction?.classification?.tumor_type ?? (
+                      {summary?.severity ?? (
                         <span className="text-slate-300 italic">
                           Pending...
                         </span>
@@ -510,28 +641,15 @@ const DoctorBrainDashboard: React.FC = () => {
                     </span>
                   </div>
 
-                  {/* 3. Flagged Risks  */}
+                  {/* 3. Recommendation */}
                   <div className="pt-2">
                     <p className="text-[10px] font-bold text-slate-400 uppercase mb-2">
-                      AI Risk Assessment
+                      Recommendation
                     </p>
-                    <ul className="space-y-2">
-                      {prediction?.risk_analysis?.risks ? (
-                        prediction.risk_analysis.risks.map((r, i) => (
-                          <li
-                            key={i}
-                            className="text-xs text-slate-700 flex gap-2"
-                          >
-                            <span className="w-1.5 h-1.5 rounded-full bg-red-400 mt-1.5 shrink-0" />
-                            {r}
-                          </li>
-                        ))
-                      ) : (
-                        <li className="text-xs text-slate-400 italic">
-                          No active risks flagged. Upload scan to analyze.
-                        </li>
-                      )}
-                    </ul>
+                    <p className="text-xs text-slate-700">
+                      {summary?.recommendation ??
+                        "No recommendation available yet."}
+                    </p>
                   </div>
                 </div>
               </div>
@@ -539,9 +657,9 @@ const DoctorBrainDashboard: React.FC = () => {
           </div>
 
           <div className="mt-12 pt-8 border-t border-slate-100 text-[9px] text-slate-400 text-center uppercase tracking-widest leading-relaxed">
-            Proprietary AI Analysis Document • InsightX Medical Systems • 2026
+                        Proprietary AI Analysis Document - InsightX Medical Systems - 2026
             <br />
-            CONFIDENTIAL PATIENT RECORD • FOR LICENSED CLINICIAN USE ONLY
+                        CONFIDENTIAL PATIENT RECORD - FOR LICENSED CLINICIAN USE ONLY
           </div>
         </div>
       </div>

@@ -16,6 +16,7 @@ export type SignupData = {
   email: string;
   password: string;
   role: Role;
+  doctorId?: string;
 };
 
 const saveSession = (data: AuthResponse) => {
@@ -134,7 +135,36 @@ export async function signup(data: SignupData): Promise<AuthResponse> {
     });
   }
 
-  throw new Error("Signup not implemented for LIVE mode yet");
+  const payload = {
+    full_name: data.fullName,
+    email: data.email,
+    password: data.password,
+    role: data.role,
+    doctor_id: data.doctorId ? Number(data.doctorId) : undefined,
+  };
+  const response = await apiClient.post<AuthResponse>("/auth/register", payload);
+  const authData = response.data;
+  saveSession(authData);
+  return authData;
 }
 
-export const authService = { login, logout, getCurrentUser, signup };
+export async function changePassword(
+  currentPassword: string,
+  newPassword: string
+): Promise<{ success: boolean }> {
+  if (USE_MOCK) {
+    return simulateRequest(() => {
+      if (!currentPassword || !newPassword) {
+        throw new Error("Missing password fields.");
+      }
+      return { success: true };
+    });
+  }
+  const response = await apiClient.post<{ success: boolean }>(
+    "/auth/change-password",
+    { current_password: currentPassword, new_password: newPassword }
+  );
+  return response.data;
+}
+
+export const authService = { login, logout, getCurrentUser, signup, changePassword };

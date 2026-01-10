@@ -6,7 +6,7 @@ from typing import List, Dict, Any
 # Import your database session and models
 from backend.data.scan_database import get_db
 from backend.models.scan import Scan
-from backend.models.patient import Patient 
+from backend.models.patient import Patient
 
 router = APIRouter()
 
@@ -46,11 +46,16 @@ def get_dashboard_stats(db: Session = Depends(get_db)):
 
         recent_scans = []
         for scan, patient in recent_scans_query:
+            patient_name = patient.full_name
+            if not patient_name:
+                patient_name = " ".join(
+                    part for part in [patient.first_name, patient.last_name] if part
+                ).strip() or "Unknown"
             recent_scans.append({
                 "id": scan.id,
-                "patient_name": f"{patient.first_name} {patient.last_name}",
-                "type": scan.scan_type, # e.g., "MRI", "CT"
-                "date": scan.created_at.strftime("%Y-%m-%d"),
+                "patient_name": patient_name,
+                "type": scan.modality,
+                "date": scan.created_at.strftime("%Y-%m-%d") if scan.created_at else "N/A",
                 "status": scan.status,
                 "risk": scan.risk_level
             })
@@ -58,8 +63,8 @@ def get_dashboard_stats(db: Session = Depends(get_db)):
         # 6. Scan Coverage (e.g., by Body Part or Date)
         # This example groups by scan type/body part
         coverage_query = db.query(
-            Scan.scan_type, func.count(Scan.id)
-        ).group_by(Scan.scan_type).all()
+            Scan.modality, func.count(Scan.id)
+        ).group_by(Scan.modality).all()
         
         scan_coverage = [
             {"subject": s_type if s_type else "Other", "A": count, "fullMark": 150}
