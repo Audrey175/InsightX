@@ -18,7 +18,13 @@ export type SidebarNav = {
 export function getSidebarNav(role: Role): SidebarNav {
   const overview: SidebarSection = {
     title: "Overview",
-    items: [{ label: "Home", to: "/dashboard" }],
+    items: [
+      {
+        label: "Home",
+        // safer than "/dashboard" if you restrict /dashboard/general to doctors
+        to: role === "doctor" ? "/dashboard/general" : "/dashboard/patient/brain",
+      },
+    ],
   };
 
   const doctorWorkspace: SidebarSection = {
@@ -33,18 +39,15 @@ export function getSidebarNav(role: Role): SidebarNav {
   const patientWorkspace: SidebarSection = {
     title: "My Workspace",
     items: [
-      { label: "My Scans", to: "/dashboard/patient/scans" },
       { label: "History", to: "/dashboard/patient/history" },
-      { label: "Brain Scan", to: "/dashboard/patient/brain" },
-      { label: "Heart Scan", to: "/dashboard/patient/heart" },
+      { label: "Brain Scans", to: "/dashboard/patient/brain" },
+      { label: "Heart Scans", to: "/dashboard/patient/heart" },
     ],
   };
 
   const settings: SidebarSection = {
     title: "Settings",
-    items: [
-      { label: "Account Settings", to: "/settings/account" },
-    ],
+    items: [{ label: "Account Settings", to: "/settings/account" }],
   };
 
   const account: SidebarSection = {
@@ -57,14 +60,21 @@ export function getSidebarNav(role: Role): SidebarNav {
     ],
   };
 
+  const assistant: SidebarSection = {
+    title: "Assistant",
+    items: [{ label: "AI Assistant", to: "/assistant" }],
+  };
+
   const sections: SidebarSection[] = [
     overview,
     role === "doctor" ? doctorWorkspace : patientWorkspace,
     settings,
     account,
+    assistant,
   ];
 
-  const bottomItems: SidebarLink[] = [{ label: "AI Assistant", to: "/assistant" }];
+  // no bottom items anymore
+  const bottomItems: SidebarLink[] = [];
 
   return { sections, bottomItems };
 }

@@ -12,7 +12,6 @@ import DoctorHeartDashboard from "./pages/dashboard/DoctorHeartDashboard";
 import PatientBrainDashboard from "./pages/dashboard/PatientBrainDashboard";
 import PatientHeartDashboard from "./pages/dashboard/PatientHeartDashboard";
 import DoctorPatientsList from "./pages/dashboard/DoctorPatientsList";
-import PatientScansOverview from "./pages/dashboard/PatientScansOverview";
 import DoctorPatientScanHistory from "./pages/dashboard/DoctorPatientScanHistory";
 import PatientScanHistory from "./pages/dashboard/PatientScanHistory";
 import ScanDetailPage from "./pages/dashboard/ScanDetailPage";
@@ -62,25 +61,31 @@ export default function App() {
         }
       />
 
-      {/* Dashboard redirect -> General Dashboard */}
-      <Route path="/dashboard" element={<Navigate to="/dashboard/general" replace />} />
+      {/* Dashboard redirect -> role home */}
+      <Route path="/dashboard" element={<RoleHomeRedirect />} />
 
       {/* Authenticated shared routes (any logged-in role) */}
       <Route element={<ProtectedRoute />}>
-        <Route path="/dashboard/general" element={<GeneralDashboard />} />
         <Route path="/assistant" element={<AssistantChatPage />} />
 
-        <Route path="/settings" element={<Navigate to="/settings/account" replace />} />
+        <Route
+          path="/settings"
+          element={<Navigate to="/settings/account" replace />}
+        />
         <Route path="/settings" element={<SettingsLayout />}>
           <Route path="account" element={<AccountSettings />} />
         </Route>
+
         <Route path="/dashboard/scans/:scanId" element={<ScanDetailPage />} />
       </Route>
 
       {/* Doctor-only routes */}
       <Route element={<ProtectedRoute allowedRoles={["doctor"]} />}>
+        <Route path="/dashboard/general" element={<GeneralDashboard />} />
+
         <Route path="/dashboard/doctor/brain" element={<DoctorBrainDashboard />} />
         <Route path="/dashboard/doctor/heart" element={<DoctorHeartDashboard />} />
+
         <Route
           path="/dashboard/doctor/brain/:patientId"
           element={<DoctorBrainDashboard />}
@@ -89,17 +94,21 @@ export default function App() {
           path="/dashboard/doctor/heart/:patientId"
           element={<DoctorHeartDashboard />}
         />
+
         <Route
           path="/dashboard/doctor/patients"
           element={<DoctorPatientsList />}
         />
-        <Route path="/dashboard/doctor/history/:patientId" element={<DoctorPatientScanHistory />} />
+        <Route
+          path="/dashboard/doctor/history/:patientId"
+          element={<DoctorPatientScanHistory />}
+        />
         <Route path="/profile/doctor" element={<DoctorProfilePage />} />
       </Route>
 
       {/* Patient-only routes */}
       <Route element={<ProtectedRoute allowedRoles={["patient"]} />}>
-        <Route path="/dashboard/patient/scans" element={<PatientScansOverview />} />
+        {/* removed: /dashboard/patient/scans */}
         <Route path="/dashboard/patient/history" element={<PatientScanHistory />} />
         <Route path="/dashboard/patient/brain" element={<PatientBrainDashboard />} />
         <Route path="/dashboard/patient/heart" element={<PatientHeartDashboard />} />
@@ -116,7 +125,7 @@ export default function App() {
                   ? "/profile/doctor"
                   : user.role === "patient"
                   ? "/profile/patient"
-                  : "/dashboard/general"
+                  : "/dashboard"
               }
               replace
             />
