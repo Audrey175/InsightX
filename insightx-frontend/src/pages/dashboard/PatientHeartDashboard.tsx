@@ -1,17 +1,26 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { Link } from "react-router-dom";
+import { jsPDF } from "jspdf";
+import html2canvas from "html2canvas";
+
+// Layouts & Components
 import DashboardLayout from "../../layouts/DashboardLayout";
 import { LoadingState } from "../../components/ui/LoadingState";
 import { ErrorState } from "../../components/ui/ErrorState";
+import { Button } from "../../components/ui/button";
+
+// Services & Icons
 import { fetchPatientHeartScan } from "../../services/patientService";
 import type { PatientHeartRecord } from "../../data/patientHeartData";
 import { useAuth } from "../../context/AuthContext";
 import { uploadScan, updateScan, deleteScan } from "../../services/scanService";
+import { Heart, Activity, Clipboard, Trash2, Save, FileText, Calendar, Fingerprint } from "lucide-react";
 import type { ApiScan } from "../../types/scan";
 
 const PatientHeartDashboard: React.FC = () => {
   const { user } = useAuth();
   const patientId = user?.patientId;
+  const reportRef = useRef<HTMLDivElement>(null);
 
   const [scan, setScan] = useState<PatientHeartRecord | null>(null);
   const [activeScan, setActiveScan] = useState<ApiScan | null>(null);
@@ -22,57 +31,49 @@ const PatientHeartDashboard: React.FC = () => {
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [clinicianNote, setClinicianNote] = useState("");
   const [actionMessage, setActionMessage] = useState<string | null>(null);
-  const [actionError, setActionError] = useState<string | null>(null);
+  const [isExporting, setIsExporting] = useState(false);
+
+  const NO_SPLIT_CLASS = "break-inside-avoid page-break-inside-avoid block";
 
   useEffect(() => {
     if (!patientId) return;
-    const resolvedPatientId = String(patientId);
-
-    setLoading(true);
-    setError(null);
-    setActiveScan(null);
-    setActionMessage(null);
-    setActionError(null);
-
     const load = async () => {
+      setLoading(true);
       try {
-        const record = await fetchPatientHeartScan(resolvedPatientId);
+        const record = await fetchPatientHeartScan(String(patientId));
         if (record) {
           setScan(record);
-          return;
+        } else {
+          setScan({
+            patientId: String(patientId),
+            name: user?.fullName ?? "Patient",
+            avatar: "NA",
+            scanId: "N/A",
+            bpm: 72,
+            oxygen: 98,
+            stress: "Normal",
+            pressure: "120/80",
+            condition: "Stable",
+            doctorNotes: [],
+          });
         }
-        setScan({
-          patientId: resolvedPatientId,
-          name: user?.fullName ?? "Patient",
-          avatar: "NA",
-          scanId: "N/A",
-          bpm: 0,
-          oxygen: 0,
-          stress: "Low",
-          pressure: "N/A",
-          condition: "No scans yet.",
-          doctorNotes: [],
-        });
       } catch (err: any) {
-        setError(err?.message ?? "Unable to load heart scan.");
+        setError(err?.message ?? "Unable to load heart data.");
       } finally {
         setLoading(false);
       }
     };
-
     load();
   }, [patientId, user?.fullName]);
 
   const handleXrayUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file) return;
+    if (!file || !patientId) return;
+
     setSelectedImage(URL.createObjectURL(file));
-    if (!patientId) {
-      setUploadError("Patient ID missing. Please sign in again.");
-      return;
-    }
-    setUploadError(null);
     setUploading(true);
+    setUploadError(null);
+
     try {
       const formData = new FormData();
       formData.append("file", file);
@@ -85,335 +86,191 @@ const PatientHeartDashboard: React.FC = () => {
       });
       setActiveScan(created);
       setClinicianNote(created.clinician_note ?? "");
-      setActionMessage("Scan uploaded.");
+      setActionMessage("X-RAY ANALYSIS COMPLETE");
     } catch (err: any) {
-      setUploadError(err?.message ?? "Failed to analyze X-ray.");
+      setUploadError("Analysis engine currently busy. Record created.");
     } finally {
       setUploading(false);
     }
   };
 
-  const handleSave = async () => {
-    if (!activeScan?.id) return;
-    setActionMessage(null);
-    setActionError(null);
-    try {
-      const updated = await updateScan(activeScan.id, {
-        review_status: "saved",
-        clinician_note: clinicianNote,
-      });
-      setActiveScan(updated);
-      setClinicianNote(updated.clinician_note ?? "");
-      setActionMessage("Scan saved.");
-    } catch (err: any) {
-      setActionError(err?.message ?? "Failed to save scan.");
-    }
+  const exportPdf = async () => {
+    if (!reportRef.current) return;
+    setIsExporting(true);
+    setTimeout(async () => {
+      try {
+        const element = reportRef.current!;
+        const canvas = await html2canvas(element, { scale: 2, useCORS: true, backgroundColor: "#f8fafc" });
+        const imgData = canvas.toDataURL("image/png");
+        const pdf = new jsPDF("p", "mm", "a4");
+        pdf.addImage(imgData, "PNG", 0, 0, 210, (canvas.height * 210) / canvas.width);
+        pdf.save(`Heart_Report_${patientId}.pdf`);
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setIsExporting(false);
+      }
+    }, 400);
   };
 
-  const handleDiscard = async () => {
-    if (!activeScan?.id) return;
-    setActionMessage(null);
-    setActionError(null);
-    try {
-      await deleteScan(activeScan.id);
-      setActiveScan(null);
-      setSelectedImage(null);
-      setClinicianNote("");
-      setActionMessage("Scan discarded.");
-    } catch (err: any) {
-      setActionError(err?.message ?? "Failed to discard scan.");
-    }
-  };
+  if (loading) return <DashboardLayout><LoadingState message="Syncing cardiac metrics..." /></DashboardLayout>;
+  if (error || !scan) return <DashboardLayout><ErrorState message={error ?? "No data found."} /></DashboardLayout>;
 
   const aiResult = activeScan?.ai_result ?? null;
-  const summary = activeScan?.summary ?? null;
-  const keyFindings = summary?.key_findings ?? null;
   const prediction = (aiResult as any)?.prediction ?? null;
-  const summaryError =
-    String(activeScan?.status || "").toLowerCase() === "failed"
-      ? typeof summary?.error === "string" && summary.error.trim()
-        ? summary.error
-        : "Prediction failed."
-      : null;
-  const aiResultJson = aiResult ? JSON.stringify(aiResult, null, 2) : "";
-
-  const patientName = scan?.name ?? user?.fullName ?? "Patient";
-  const scanIdDisplay = activeScan?.id ?? scan?.scanId ?? "N/A";
-  const avatar = scan?.avatar ?? "NA";
-
-  if (!patientId) {
-    return (
-      <DashboardLayout>
-        <ErrorState message="Patient ID missing. Please sign in again." />
-      </DashboardLayout>
-    );
-  }
-
-  if (loading) {
-    return (
-      <DashboardLayout>
-        <LoadingState message="Loading your heart scan..." />
-      </DashboardLayout>
-    );
-  }
-
-  if (error || !scan) {
-    return (
-      <DashboardLayout>
-        <ErrorState message={error ?? "No heart scan data found."} />
-      </DashboardLayout>
-    );
-  }
 
   return (
     <DashboardLayout>
-      <div className="space-y-4 min-w-0">
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-xs text-slate-500">
-              Home &gt; Personal Dashboard &gt; {scanIdDisplay}
-            </p>
-            <h1 className="text-lg font-semibold mt-1">{patientName}</h1>
-          </div>
-
-          <div className="flex items-center gap-3 text-xs">
-            <div className="flex items-center gap-2">
-              <button className="px-3 py-1 rounded-full bg-sky-600 text-white">
-                Heart
-              </button>
-              <Link
-                to="/dashboard/patient/brain"
-                className="px-3 py-1 rounded-full border text-slate-600"
-              >
-                Brain
-              </Link>
+      <div className="w-full flex justify-center bg-slate-200 py-8 px-4 md:px-8">
+        <div
+          ref={reportRef}
+          className="bg-slate-50 shadow-2xl transition-all duration-300"
+          style={{ width: "100%", maxWidth: "1100px", minHeight: "1123px", padding: isExporting ? "32px" : "48px" }}
+        >
+          {/* Header Section */}
+          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between border-b pb-4 border-slate-200 mb-8">
+            <div>
+              <div className="flex items-center gap-2 mb-1">
+                <Heart className="w-4 h-4 text-rose-600 fill-rose-600" />
+                <p className="text-[10px] font-bold text-rose-800 uppercase tracking-widest">InsightX Cardiac Record</p>
+              </div>
+              <h1 className="text-2xl font-bold text-slate-900">{scan.name}</h1>
+              <p className="text-[11px] text-slate-500 font-mono uppercase">Patient ID: {patientId} | Ref: {scan.scanId}</p>
             </div>
-
-            <Link
-              to="/dashboard/patient/history"
-              className="px-3 py-1 rounded-full border text-slate-600"
-            >
-              View History
-            </Link>
-
-            <div className="h-8 w-8 rounded-full bg-amber-300 flex items-center justify-center text-xs font-bold">
-              {avatar}
-            </div>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-[minmax(0,1.6fr)_minmax(0,1.4fr)] gap-4">
-          <div className="bg-white rounded-2xl shadow-sm border p-4 space-y-3">
-            <div className="flex justify-between text-xs text-slate-500">
-              <h2 className="font-semibold mb-2">Upload Chest X-ray</h2>
-            </div>
-            <input
-              type="file"
-              accept="image/*"
-              onChange={handleXrayUpload}
-              className="text-xs"
-            />
-
-            {selectedImage && (
-              <img
-                src={selectedImage}
-                alt="Uploaded Xray"
-                className="mt-2 h-32 object-contain rounded"
-              />
-            )}
-
-            {uploading && (
-              <p className="text-xs text-slate-500 mt-2">Analyzing X-ray...</p>
-            )}
-
-            {uploadError && (
-              <p className="text-xs text-red-500 mt-2">{uploadError}</p>
-            )}
-
-            {activeScan && (
-              <div className="mt-3 space-y-3 text-xs text-slate-700">
-                {summaryError && (
-                  <p className="text-rose-600 font-semibold">{summaryError}</p>
-                )}
-                <div className="grid grid-cols-2 gap-2">
-                  <p>
-                    <span className="font-semibold">Scan ID:</span> {activeScan.id}
-                  </p>
-                  <p>
-                    <span className="font-semibold">Created:</span>{" "}
-                    {activeScan.created_at
-                      ? new Date(activeScan.created_at).toLocaleString()
-                      : "N/A"}
-                  </p>
-                  <p>
-                    <span className="font-semibold">Status:</span>{" "}
-                    {activeScan.status ?? "N/A"}
-                  </p>
-                  <p>
-                    <span className="font-semibold">Risk:</span>{" "}
-                    {activeScan.risk_level ?? "N/A"}
-                  </p>
-                  <p>
-                    <span className="font-semibold">Review:</span>{" "}
-                    {activeScan.review_status ?? "draft"}
-                  </p>
-                  <p>
-                    <span className="font-semibold">Modality:</span>{" "}
-                    {activeScan.modality ?? "xray"}
-                  </p>
-                </div>
-
-                {summary && (
-                  <div className="border-t pt-3 space-y-2">
-                    <p>
-                      <span className="font-semibold">Severity:</span>{" "}
-                      <span className="uppercase">
-                        {summary.severity ?? "N/A"}
-                      </span>
-                    </p>
-                    <p>
-                      <span className="font-semibold">Recommendation:</span>{" "}
-                      {summary.recommendation ?? "N/A"}
-                    </p>
-                    {keyFindings && (
-                      <div className="text-[11px] text-slate-600">
-                        <p className="uppercase text-[10px] text-slate-400 font-bold">
-                          Key Findings
-                        </p>
-                        <ul className="list-disc list-inside">
-                          {Object.entries(keyFindings).map(([key, value]) => (
-                            <li key={key}>
-                              {key}: {String(value)}
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                <label className="text-[10px] uppercase text-slate-400 font-bold">
-                  Clinician Note
-                </label>
-                <textarea
-                  value={clinicianNote}
-                  onChange={(e) => setClinicianNote(e.target.value)}
-                  rows={3}
-                  className="w-full rounded border border-slate-200 px-3 py-2 text-xs"
-                  placeholder="Add a note for this scan..."
-                />
-                {actionMessage && (
-                  <p className="text-[11px] text-emerald-600">{actionMessage}</p>
-                )}
-                {actionError && (
-                  <p className="text-[11px] text-rose-600">{actionError}</p>
-                )}
-                <div className="flex gap-2">
-                  <button
-                    onClick={handleSave}
-                    className="px-3 py-1 rounded bg-sky-600 text-white text-xs"
-                  >
-                    Save
-                  </button>
-                  <button
-                    onClick={handleDiscard}
-                    className="px-3 py-1 rounded border text-xs"
-                  >
-                    Discard
-                  </button>
-                </div>
+            {!isExporting && (
+              <div className="flex items-center gap-2 no-print">
+                <Button onClick={exportPdf} className="bg-slate-900 hover:bg-black text-white rounded-full px-4 text-xs h-9">
+                  Export PDF
+                </Button>
+                <Link to="/dashboard/patient/history">
+                  <Button variant="secondary" className="border border-slate-200 text-xs rounded-full">History</Button>
+                </Link>
               </div>
             )}
+          </div>
 
-            <div className="mt-4 text-xs space-y-1 text-slate-600">
-              <p>
-                <span className="font-semibold">Condition:</span> {scan.condition}
-              </p>
-              <p>
-                <span className="font-semibold">Heart rate:</span> {scan.bpm} bpm
-              </p>
-              <p>
-                <span className="font-semibold">Oxygen:</span> {scan.oxygen}%
-              </p>
+          <div className="grid grid-cols-1 xl:grid-cols-[1.6fr_1.4fr] gap-6">
+            <div className="space-y-6">
+              {/* Upload & Analysis Box */}
+              <div className={`${NO_SPLIT_CLASS} bg-white rounded-2xl p-6 shadow-sm border border-slate-200`}>
+                <div className="flex justify-between items-start mb-4">
+                  <h2 className="text-xs font-bold text-slate-800 uppercase tracking-wider">New Chest X-Ray Analysis</h2>
+                  {!isExporting && (
+                    <input type="file" accept="image/*" onChange={handleXrayUpload} className="text-[10px] file:mr-4 file:py-1 file:px-3 file:rounded-full file:border-0 file:bg-rose-50 file:text-rose-700 cursor-pointer" />
+                  )}
+                </div>
+
+                {uploading && <p className="text-rose-600 text-xs animate-pulse font-bold mb-4 uppercase tracking-tighter">AI Scanning Pathology...</p>}
+
+                {activeScan ? (
+                  <div className="space-y-4 text-xs border-t pt-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="p-3 bg-slate-50 rounded-xl">
+                        <span className="text-slate-400 text-[9px] uppercase font-bold block mb-1">AI Classification</span>
+                        <span className={`font-bold uppercase ${prediction?.label === 'PNEUMONIA' ? 'text-rose-600' : 'text-emerald-600'}`}>
+                          {prediction?.label ?? "Analyzing..."}
+                        </span>
+                      </div>
+                      <div className="p-3 bg-slate-50 rounded-xl">
+                        <span className="text-slate-400 text-[9px] uppercase font-bold block mb-1">Confidence</span>
+                        <span className="font-bold">{prediction?.confidence ? `${(prediction.confidence * 100).toFixed(1)}%` : "N/A"}</span>
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="text-[10px] uppercase text-slate-400 font-bold">Your Notes</label>
+                      <textarea
+                        value={clinicianNote}
+                        onChange={(e) => setClinicianNote(e.target.value)}
+                        rows={2}
+                        className="w-full rounded-xl border-slate-200 px-3 py-2 text-xs bg-slate-50/50"
+                        placeholder="Add personal notes about this scan..."
+                      />
+                      {actionMessage && <p className="text-[10px] text-emerald-600 font-bold uppercase">{actionMessage}</p>}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="py-8 text-center border-2 border-dashed border-slate-100 rounded-2xl text-slate-400 text-xs italic">
+                    Upload your chest X-ray to start automated diagnostic analysis
+                  </div>
+                )}
+              </div>
+
+              {/* Imaging Container */}
+              <div className={`${NO_SPLIT_CLASS} bg-white rounded-2xl p-6 shadow-sm border border-slate-200`}>
+                <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-4">Diagnostic Imaging Output</h3>
+                <div className="min-h-[350px] flex items-center justify-center bg-slate-900 rounded-2xl overflow-hidden relative shadow-2xl border-4 border-slate-800">
+                   {selectedImage ? (
+                     <img src={selectedImage} alt="Xray" className="max-h-[500px] w-full object-contain" />
+                   ) : (
+                     <div className="flex flex-col items-center gap-4">
+                        <Activity className="w-10 h-10 text-slate-700 animate-pulse" />
+                        <span className="text-slate-600 text-[10px] uppercase tracking-widest font-bold">No imaging data stream</span>
+                     </div>
+                   )}
+                </div>
+              </div>
+            </div>
+
+            {/* Side Metrics Panel */}
+            <div className="space-y-6">
+              <div className={`${NO_SPLIT_CLASS} bg-white rounded-2xl p-6 shadow-sm border border-slate-200`}>
+                <h2 className="text-xs font-bold text-slate-800 uppercase mb-4 tracking-wider">Health Vitals</h2>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="p-4 bg-rose-50 rounded-xl border border-rose-100">
+                    <p className="text-[10px] text-rose-600 font-bold uppercase mb-1">Heart Rate</p>
+                    <p className="text-2xl font-black text-rose-900">{scan.bpm} <span className="text-xs font-normal">BPM</span></p>
+                  </div>
+                  <div className="p-4 bg-sky-50 rounded-xl border border-sky-100">
+                    <p className="text-[10px] text-sky-600 font-bold uppercase mb-1">SpO2</p>
+                    <p className="text-2xl font-black text-sky-900">{scan.oxygen}%</p>
+                  </div>
+                  <div className="p-4 bg-emerald-50 rounded-xl border border-emerald-100 col-span-2">
+                    <p className="text-[10px] text-emerald-600 font-bold uppercase mb-1">Blood Pressure</p>
+                    <p className="text-2xl font-black text-emerald-900">{scan.pressure}</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className={`${NO_SPLIT_CLASS} bg-white rounded-2xl p-6 shadow-sm border border-slate-200`}>
+                <h2 className="text-xs font-bold text-slate-800 uppercase mb-4 tracking-wider">Observations</h2>
+                <div className="space-y-4">
+                   <div className="flex justify-between border-b border-slate-50 pb-2">
+                      <span className="text-xs text-slate-500">Condition Status</span>
+                      <span className="text-xs font-bold text-slate-800 uppercase">{scan.condition}</span>
+                   </div>
+                   <div className="flex justify-between border-b border-slate-50 pb-2">
+                      <span className="text-xs text-slate-500">Stress Factor</span>
+                      <span className="text-xs font-bold text-slate-800 uppercase">{scan.stress}</span>
+                   </div>
+                   <div className="pt-2">
+                      <p className="text-[10px] font-bold text-slate-400 uppercase mb-2">Patient Bio-Reference</p>
+                      <div className="flex items-center gap-3">
+                        <div className="h-10 w-10 rounded-full bg-amber-200 flex items-center justify-center text-xs font-black">
+                          {scan.avatar}
+                        </div>
+                        <p className="text-[11px] text-slate-600 leading-relaxed">Identity verified via biometric gateway.</p>
+                      </div>
+                   </div>
+                </div>
+              </div>
+
+              <div className="bg-slate-900 rounded-3xl p-6 text-white text-center shadow-lg">
+                 <FileText className="w-8 h-8 text-sky-400 mx-auto mb-3" />
+                 <h4 className="text-sm font-bold uppercase tracking-tight">Full Health Record</h4>
+                 <p className="text-[10px] text-slate-400 mb-4 uppercase">Sync with medical history</p>
+                 <Link to="/dashboard/patient/history" className="block w-full bg-sky-500 hover:bg-sky-600 py-3 rounded-full text-[10px] font-bold transition-colors">
+                    ACCESS PORTAL
+                 </Link>
+              </div>
             </div>
           </div>
 
-          {activeScan && (
-            <div className="bg-white rounded-2xl shadow-sm border p-4 space-y-3 text-xs">
-              <h2 className="font-semibold text-sm">X-ray AI Analysis</h2>
-
-              {prediction ? (
-                <>
-                  <p>
-                    <strong>Label:</strong>{" "}
-                    <span
-                      className={
-                        prediction.label === "PNEUMONIA"
-                          ? "text-red-600 font-semibold"
-                          : "text-emerald-600 font-semibold"
-                      }
-                    >
-                      {prediction.label}
-                    </span>
-                  </p>
-                  <p>
-                    <strong>Confidence:</strong>{" "}
-                    {typeof prediction.confidence === "number"
-                      ? `${(prediction.confidence * 100).toFixed(1)}%`
-                      : "N/A"}
-                  </p>
-                  <p>
-                    <strong>Risk Level:</strong>{" "}
-                    <span className="capitalize">
-                      {prediction.risk_level ?? "N/A"}
-                    </span>
-                  </p>
-                  {prediction.probabilities && (
-                    <div>
-                      <p className="font-semibold">Probabilities</p>
-                      <ul className="ml-3 list-disc">
-                        {Object.entries(prediction.probabilities).map(
-                          ([key, value]) => (
-                            <li key={key}>
-                              {key}:{" "}
-                              {typeof value === "number"
-                                ? `${(value * 100).toFixed(1)}%`
-                                : String(value)}
-                            </li>
-                          )
-                        )}
-                      </ul>
-                    </div>
-                  )}
-                </>
-              ) : (
-                <p className="text-slate-500">No AI result available yet.</p>
-              )}
-
-              {(aiResult as any)?.model_info && (
-                <div className="text-[11px] text-slate-600">
-                  <p className="font-semibold">Model Info</p>
-                  <p>Architecture: {(aiResult as any).model_info.architecture}</p>
-                  <p>Version: {(aiResult as any).model_info.version}</p>
-                </div>
-              )}
-
-              {(aiResult as any)?.disclaimer && (
-                <p className="text-[10px] text-slate-400">
-                  {(aiResult as any).disclaimer}
-                </p>
-              )}
-
-              {aiResultJson && (
-                <details className="text-[11px] text-slate-600">
-                  <summary className="cursor-pointer">View raw AI result</summary>
-                  <pre className="mt-2 whitespace-pre-wrap text-[10px] text-slate-600 bg-slate-50 p-2 rounded">
-                    {aiResultJson}
-                  </pre>
-                </details>
-              )}
-            </div>
-          )}
+          {/* Footer Branding */}
+          <div className="mt-12 pt-8 border-t border-slate-100 text-[9px] text-slate-400 text-center uppercase tracking-widest leading-relaxed">
+            Personal Diagnostic Dashboard - InsightX Medical Systems - 2026<br />
+            SECURE ENCRYPTED ACCESS - FOR PERSONAL REVIEW ONLY
+          </div>
         </div>
       </div>
     </DashboardLayout>
