@@ -14,8 +14,6 @@ import { uploadScan, updateScan, deleteScan } from "../../services/scanService";
 import type { ApiScan } from "../../types/scan";
 
 const DoctorHeartDashboard: React.FC = () => {
-  const { patientId: routePatientId } = useParams<{ patientId?: string }>();
-  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { user } = useAuth();
 
@@ -30,7 +28,12 @@ const DoctorHeartDashboard: React.FC = () => {
   const [actionMessage, setActionMessage] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
 
-  const patientId = searchParams.get("patientId") ?? routePatientId ?? "";
+  const { patientId: pathId } = useParams<{ patientId: string }>();
+  const [searchParams] = useSearchParams();
+  const queryId = searchParams.get("patientId");
+  const patientId = pathId || queryId || "";
+
+  console.log("Resolved Patient ID:", patientId);
 
   useEffect(() => {
     if (!patientId) return;

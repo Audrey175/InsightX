@@ -41,9 +41,10 @@ export interface MRIPredictionResult {
   disclaimer: string;
 }
 
-export async function predictMRI(file: File): Promise<MRIPredictionResult> {
+export async function predictMRI(file: File, patientId: string): Promise<MRIPredictionResult> {
   const formData = new FormData();
   formData.append("file", file);
+  formData.append("patient_id", patientId);
 
   const response = await fetch(`${API_BASE_URL}/predict/mri`, {
     method: "POST",

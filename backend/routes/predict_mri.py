@@ -1,16 +1,23 @@
+import json
 import os
 import tempfile
 import torch
 import numpy as np
 import torchvision.transforms as T
 from PIL import Image
-from fastapi import APIRouter, UploadFile, File
+from fastapi import APIRouter, UploadFile, File, Form, Depends
 from typing import List, Dict
+
+
+
 
 # Model Imports
 from backend.models.unet import UNet
 from backend.models.classifier import MRIDiseaseClassifier
 from backend.modules.mri_service import analyze_dicom_zip
+from backend.data.scan_database import get_db
+from backend.models.scan import Scan
+from sqlalchemy.orm import Session
 
 router = APIRouter()
 
@@ -27,14 +34,16 @@ TUMOR_RISK_MAP: Dict[str, Dict] = {
         "risks": ["Rapid growth", "Seizures", "Cognitive impairment", "High recurrence"]
     },
     "meningioma": {
-        "risks": ["Intracranial pressure", "Vision problems", "Compression of brain structures"]
+        "risks": [
+            "Intracranial pressure",
+            "Vision problems",
+            "Compression of brain structures",
+        ]
     },
     "pituitary": {
         "risks": ["Hormonal imbalance", "Vision loss", "Endocrine dysfunction"]
     },
-    "notumor": {
-        "risks": ["Normal brain appearance", "Routine monitoring recommended"]
-    }
+    "notumor": {"risks": ["Normal brain appearance", "Routine monitoring recommended"]},
 }
 
 # =====================
@@ -43,7 +52,9 @@ TUMOR_RISK_MAP: Dict[str, Dict] = {
 # Load Segmentation Model
 seg_model = UNet(in_channels=1, num_classes=2)
 if os.path.exists(SEG_MODEL_PATH):
-    seg_model.load_state_dict(torch.load(SEG_MODEL_PATH, map_location=DEVICE, weights_only=True))
+    seg_model.load_state_dict(
+        torch.load(SEG_MODEL_PATH, map_location=DEVICE, weights_only=True)
+    )
 seg_model.to(DEVICE).eval()
 
 # Load Classification Model
@@ -60,12 +71,15 @@ else:
 # PREPROCESSING
 # =====================
 seg_transform = T.Compose([T.Resize((IMAGE_SIZE, IMAGE_SIZE)), T.ToTensor()])
-cls_transform = T.Compose([
-    T.Resize((224, 224)),
-    T.Grayscale(num_output_channels=3),
-    T.ToTensor(),
-    T.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
-])
+cls_transform = T.Compose(
+    [
+        T.Resize((224, 224)),
+        T.Grayscale(num_output_channels=3),
+        T.ToTensor(),
+        T.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+    ]
+)
+
 
 # =====================
 # AI CORE FUNCTIONS
@@ -75,6 +89,7 @@ def segment_tumor(image_tensor):
         logits = seg_model(image_tensor)
         pred = torch.argmax(logits, dim=1)
     return pred[0].cpu().numpy()
+
 
 def analyze_mask(mask):
     tumor_pixels = int((mask == 1).sum())
@@ -86,8 +101,9 @@ def analyze_mask(mask):
     return {
         "tumor_detected": True,
         "tumor_size_pixels": tumor_pixels,
-        "tumor_location": {"x": float(x), "y": float(y)}
+        "tumor_location": {"x": float(x), "y": float(y)},
     }
+
 
 def classify_disease(image_tensor):
     with torch.no_grad():
@@ -97,8 +113,11 @@ def classify_disease(image_tensor):
     return {
         "tumor_type": CLASS_NAMES[idx],
         "confidence": round(probs[idx].item(), 4),
-        "probabilities": {CLASS_NAMES[i]: round(probs[i].item(), 4) for i in range(len(CLASS_NAMES))}
+        "probabilities": {
+            CLASS_NAMES[i]: round(probs[i].item(), 4) for i in range(len(CLASS_NAMES))
+        },
     }
+
 
 # =====================
 # INTEGRATED LOGIC
@@ -114,11 +133,17 @@ def run_ai_analysis(heatmap_path: str):
     cls_result = classify_disease(cls_input)
 
     # 2. Risks
-    risk_info = TUMOR_RISK_MAP.get(cls_result["tumor_type"].lower(), {"risks": ["Unknown type"]})
+    risk_info = TUMOR_RISK_MAP.get(
+        cls_result["tumor_type"].lower(), {"risks": ["Unknown type"]}
+    )
 
     # 3. Segmentation (if applicable)
     if cls_result["tumor_type"].lower() == "notumor":
-        seg_result = {"tumor_detected": False, "tumor_size_pixels": 0, "tumor_location": None}
+        seg_result = {
+            "tumor_detected": False,
+            "tumor_size_pixels": 0,
+            "tumor_location": None,
+        }
     else:
         seg_input = seg_transform(image).unsqueeze(0).to(DEVICE)
         mask = segment_tumor(seg_input)
@@ -127,14 +152,20 @@ def run_ai_analysis(heatmap_path: str):
     return {
         "segmentation": seg_result,
         "classification": cls_result,
-        "risk_analysis": risk_info
+        "risk_analysis": risk_info,
     }
+
 
 # =====================
 # ROUTE HANDLER
 # =====================
 @router.post("/predict/mri")
-async def predict_mri(file: UploadFile = File(...)):
+async def predict_mri(
+    file: UploadFile = File(...),
+    patient_id: str = Form(...),
+    db: Session = Depends(get_db)
+):
+
     # 1. Save uploaded zip to temp file
     with tempfile.NamedTemporaryFile(delete=False, suffix=".zip") as tmp:
         tmp.write(await file.read())
@@ -146,12 +177,27 @@ async def predict_mri(file: UploadFile = File(...)):
 
         # 3. Run AI analysis on the generated heatmap slice
         heatmap_url_path = mri_data["heatmap_slice"]
-        relative_file_path = heatmap_url_path.replace("/static", "backend/static", 1).lstrip("/")
+        relative_file_path = heatmap_url_path.replace(
+            "/static", "backend/static", 1
+        ).lstrip("/")
         static_path = os.path.join(os.getcwd(), relative_file_path)
         ai_results = run_ai_analysis(static_path)
+        new_scan = Scan(
+            patient_id=int(patient_id),
+            modality="MRI",
+            file_path=mri_data["reconstruction_file"],
+            original_filename=file.filename,
+            status="completed",
+            ai_result_json=json.dumps(ai_results), # Store AI results as string
+            risk_level=ai_results["classification"]["tumor_type"] # Example mapping
+        )
 
-        # 4. Merge results
-        return {**mri_data,  **ai_results}
+        db.add(new_scan)
+        db.commit()
+        db.refresh(new_scan)
+
+        return {**mri_data, **ai_results, "id": new_scan.id}
+
 
     finally:
         if os.path.exists(zip_path):

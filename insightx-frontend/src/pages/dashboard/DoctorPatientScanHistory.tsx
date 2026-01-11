@@ -36,40 +36,42 @@ const emptyPatientForm: PatientForm = {
 };
 
 const mapScanToSession = (scan: ApiScan): ScanSession => {
-  const modality = String(scan.modality || "").toLowerCase();
-  const type: ScanType = modality === "mri" ? "brain" : "heart";
-  const modalityLabel =
-    modality === "mri" ? "MRI" : modality === "xray" ? "Xray" : "Other";
+  const rawModality = String(scan.modality || "").toLowerCase();
+  
+  const modalityMap: Record<string, "MRI" | "Xray" | "Other"> = {
+    mri: "MRI",
+    xray: "Xray",
+    ct: "Other", 
+  };
+
+  const modalityLabel = modalityMap[rawModality] || "Other";
+
+  // 1. Extract Real AI Data
+  const aiData = scan.ai_result;
+  const tumorType = aiData?.classification?.tumor_type;
+  const confidence = aiData?.classification?.confidence;
+
   const statusRaw = String(scan.status || "").toLowerCase();
   const status =
     statusRaw === "failed"
       ? "failed"
-      : statusRaw === "predicted" || statusRaw === "completed"
+      : statusRaw === "completed" || statusRaw === "predicted"
       ? "done"
       : "processing";
-  const progress = status === "done" || status === "failed" ? 100 : 50;
-  const summaryError = scan.summary?.error;
 
   return {
     id: String(scan.id),
     patientId: String(scan.patient_id ?? ""),
-    type,
+    type: rawModality === "mri" ? "brain" : "heart", 
     createdAt: scan.created_at ?? new Date().toISOString(),
-    fileName: scan.original_filename ?? scan.file_path ?? "Uploaded scan",
+    fileName: scan.original_filename ?? "MRI Scan Session",
     modality: modalityLabel,
-    notes: scan.clinician_note ?? undefined,
-    status,
-    progress,
-    error:
-      status === "failed"
-        ? typeof summaryError === "string" && summaryError.trim()
-          ? summaryError
-          : "Prediction failed"
-        : undefined,
-    riskLevel: scan.risk_level ?? undefined,
-    reviewStatus: scan.review_status ?? undefined,
+    riskLevel: (tumorType ? `${tumorType.toUpperCase()} (${(confidence * 100).toFixed(1)}%)` : scan.risk_level) ?? undefined,
+    status: status as any, // Cast status to match expected literal types
+    progress: status === "done" ? 100 : 50,
+    reviewStatus: scan.review_status ?? "Draft",
     clinicianNote: scan.clinician_note ?? undefined,
-    updatedAt: scan.updated_at ?? undefined,
+    notes: scan.clinician_note ?? undefined,
   };
 };
 
@@ -88,7 +90,9 @@ export default function DoctorPatientScanHistory() {
   const [scanError, setScanError] = useState<string | null>(null);
   const [patientMessage, setPatientMessage] = useState<string | null>(null);
   const [patientError, setPatientError] = useState<string | null>(null);
-  const [assignmentMessage, setAssignmentMessage] = useState<string | null>(null);
+  const [assignmentMessage, setAssignmentMessage] = useState<string | null>(
+    null
+  );
   const [assignmentError, setAssignmentError] = useState<string | null>(null);
   const [savingPatient, setSavingPatient] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -212,7 +216,10 @@ export default function DoctorPatientScanHistory() {
         }
       }
 
-      const res = await apiClient.put<any>(`/api/patients/${patientId}`, payload);
+      const res = await apiClient.put<any>(
+        `/api/patients/${patientId}`,
+        payload
+      );
       const p = res.data ?? {};
       const name =
         p.full_name ||
@@ -445,7 +452,9 @@ export default function DoctorPatientScanHistory() {
               key={key}
               onClick={() => setTab(key)}
               className={`px-3 py-1 rounded-full border text-xs ${
-                tab === key ? "bg-slate-900 text-white" : "bg-white text-slate-700"
+                tab === key
+                  ? "bg-slate-900 text-white"
+                  : "bg-white text-slate-700"
               }`}
             >
               {key === "all" ? "All" : key === "brain" ? "Brain" : "Heart"}
@@ -459,27 +468,33 @@ export default function DoctorPatientScanHistory() {
           ) : scanError ? (
             <div className="p-6 text-sm text-rose-600">{scanError}</div>
           ) : filtered.length === 0 ? (
-            <div className="p-6 text-sm text-slate-600">No scan sessions yet.</div>
+            <div className="p-6 text-sm text-slate-600">
+              No scan sessions yet.
+            </div>
           ) : (
             <ul className="divide-y">
               {filtered.map((session) => (
                 <li key={session.id} className="p-4 flex flex-col gap-2">
                   <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
                     <div className="flex flex-col">
-                      <span className="text-sm font-semibold">
-                        {session.type.toUpperCase()} - {session.fileName ?? "Uploaded scan"}
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-bold text-slate-900">
+                          {session.type.toUpperCase()} - {session.fileName}
+                        </span>
+                        {/* Display real AI result badge */}
+                        {session.riskLevel && (
+                          <span className="text-[10px] bg-sky-100 text-sky-700 px-2 py-0.5 rounded-full font-bold uppercase tracking-tighter">
+                            AI: {session.riskLevel}
+                          </span>
+                        )}
+                      </div>
+                      <span className="text-[11px] text-slate-500 font-mono">
+                        ID: {session.id} |{" "}
+                        {new Date(session.createdAt).toLocaleString()}
                       </span>
-                      <span className="text-xs text-slate-500">
-                        {new Date(session.createdAt).toLocaleString()} - {session.modality ?? "Unknown"}
-                      </span>
-                      <span className="text-xs text-slate-500">
-                        Scan ID: {session.id}
-                        {session.riskLevel && ` | Risk: ${session.riskLevel}`}
-                        {session.reviewStatus && ` | Review: ${session.reviewStatus}`}
-                      </span>
-                      {session.notes && (
-                        <span className="text-xs text-slate-600 line-clamp-2">
-                          Notes: {session.notes}
+                      {session.clinicianNote && (
+                        <span className="text-xs text-slate-600 italic mt-1 bg-slate-50 p-1 rounded border-l-2 border-slate-300">
+                          " {session.clinicianNote} "
                         </span>
                       )}
                     </div>
@@ -495,7 +510,8 @@ export default function DoctorPatientScanHistory() {
                       >
                         {session.status} - {session.progress}%
                       </span>
-                      {session.status === "processing" || session.status === "queued" ? (
+                      {session.status === "processing" ||
+                      session.status === "queued" ? (
                         <div className="flex items-center gap-2">
                           <div className="h-2 w-24 bg-slate-100 rounded overflow-hidden">
                             <div
